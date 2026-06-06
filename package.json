@@ -1,0 +1,8 @@
+{
+  "name": "lead-rotation",
+  "version": "1.0.0",
+  "description": "Lead rotation app for Showroom LA",
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

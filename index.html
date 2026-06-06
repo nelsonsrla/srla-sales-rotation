@@ -1,0 +1,1195 @@
+<!-- build-v2 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Lead Rotation</title>
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Lead Rotation">
+<meta name="theme-color" content="#1B3A5C">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --blue:        #1B3A5C;
+  --blue-mid:    #2563A8;
+  --blue-light:  #EAF2FB;
+  --green:       #166534;
+  --green-bg:    #dcfce7;
+  --amber:       #92400e;
+  --amber-bg:    #fef3c7;
+  --gray-bg:     #F0F2F5;
+  --gray-border: #E0E0E0;
+  --gray-text:   #888;
+  --dark:        #1A1A1A;
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif;
+  background: var(--gray-bg); min-height: 100vh; min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+@media (min-width: 600px) {
+  #app { max-width: 680px; margin: 0 auto; box-shadow: 0 0 40px rgba(0,0,0,0.10); min-height: 100vh; }
+  .drawer, .modal-sheet { max-width: 680px; left: 50% !important; right: auto !important; transform: translateX(-50%) translateY(100%); }
+  .drawer.open, .modal-overlay.open .modal-sheet { transform: translateX(-50%) translateY(0); }
+  .drawer-overlay { background: rgba(0,0,0,0.35); }
+}
+#app { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding-top: var(--safe-top); }
+.app-header { background: var(--blue); padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; }
+.app-header h1 { color: white; font-size: 1.15rem; font-weight: 800; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #4caf50; transition: background 0.3s; }
+.sync-dot.offline { background: #ff9800; }
+.sync-dot.error   { background: #f44336; }
+.settings-btn { background: rgba(255,255,255,0.15); border: none; border-radius: 8px; color: white; padding: 7px 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.photos-link { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.04em; color: white; text-decoration: none; transition: background 0.18s; }
+.photos-link:hover { background: rgba(255,255,255,0.22); }
+.photos-link svg { width: 13px; height: 13px; flex-shrink: 0; }
+.photos-link-text { }
+@media (max-width: 640px) { .photos-link-text { display: none; } .photos-link { padding: 6px 8px; } }
+.notif-banner { display: none; background: var(--amber-bg); border-bottom: 1px solid #fcd34d; padding: 10px 16px; font-size: 0.82rem; color: var(--amber); align-items: center; gap: 10px; }
+.notif-banner.show { display: flex; }
+.notif-banner b { font-weight: 700; }
+.notif-banner button { margin-left: auto; flex-shrink: 0; background: var(--amber); color: white; border: none; border-radius: 8px; padding: 5px 12px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
+.cards-wrap { flex: 1; display: flex; flex-direction: column; gap: 14px; padding: 16px; align-content: start; }
+.card { background: white; border-radius: 20px; padding: 20px 18px 18px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); display: flex; flex-direction: column; gap: 12px; }
+.channel-tag { font-size: 0.68rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; }
+.card.store .channel-tag { color: var(--blue-mid); }
+.rep-now { font-size: 2rem; font-weight: 900; line-height: 1.1; letter-spacing: -0.5px; word-break: break-word; }
+.card.store .rep-now { color: var(--blue); }
+.up-next { font-size: 0.8rem; color: var(--gray-text); }
+.up-next b { color: #555; font-weight: 600; }
+.notif-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 0.7rem; font-weight: 600; border-radius: 20px; padding: 3px 9px; width: fit-content; }
+.notif-pill.on  { color: var(--green); background: var(--green-bg); }
+.notif-pill.off { color: var(--gray-text); background: var(--gray-bg); }
+.assign-btn { border: none; border-radius: 13px; padding: 14px 10px; font-size: 0.95rem; font-weight: 700; cursor: pointer; color: white; transition: transform 0.1s, opacity 0.15s; }
+.assign-btn:active { transform: scale(0.97); opacity: 0.88; }
+.card.store .assign-btn { background: linear-gradient(135deg, #1565c0, #1e88e5); }
+/* HISTORY */
+.history-card { background: white; border-radius: 20px; padding: 18px 18px 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); overflow: hidden; }
+.history-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.history-title { font-size: 0.68rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gray-text); }
+.history-clear { font-size: 0.75rem; font-weight: 600; color: #dc2626; background: none; border: none; cursor: pointer; padding: 2px 6px; }
+.history-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; padding-right: 4px; -webkit-overflow-scrolling: touch; }
+.history-filter { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.history-filter label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--gray-text); white-space: nowrap; }
+.history-filter input[type="date"] { border: 1.5px solid var(--gray-border); border-radius: 9px; padding: 5px 8px; font-size: 0.78rem; color: var(--dark); outline: none; background: white; }
+.history-filter input[type="date"]:focus { border-color: var(--blue-mid); }
+.history-filter-clear { font-size: 0.72rem; font-weight: 600; color: var(--gray-text); background: none; border: none; cursor: pointer; padding: 2px 4px; text-decoration: underline; }
+.history-search-wrap { position: relative; margin-bottom: 10px; }
+.history-search { width: 100%; border: 1.5px solid var(--gray-border); border-radius: 11px; padding: 9px 36px 9px 13px; font-size: 0.82rem; outline: none; color: var(--dark); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif; background: white; }
+.history-search:focus { border-color: var(--blue-mid); }
+.history-search-clear { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 0.9rem; color: var(--gray-text); padding: 2px; display: none; }
+.history-search-clear.show { display: block; }
+.history-item { border: 1px solid var(--gray-border); border-radius: 12px; padding: 10px 13px; display: flex; flex-direction: column; gap: 3px; }
+.history-item.type-shopify { border-left: 3px solid var(--blue-mid); }
+.history-item.type-manual  { border-left: 3px solid #16a34a; }
+.history-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.history-rep { font-size: 0.88rem; font-weight: 700; color: var(--dark); }
+.history-badge { font-size: 0.62rem; font-weight: 700; padding: 2px 7px; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.history-badge.shopify { background: var(--blue-light); color: var(--blue-mid); }
+.history-badge.manual  { background: var(--green-bg); color: var(--green); }
+.history-detail { font-size: 0.78rem; color: #555; line-height: 1.4; }
+.history-time { font-size: 0.7rem; color: var(--gray-text); }
+.history-empty { font-size: 0.82rem; color: var(--gray-text); text-align: center; padding: 16px 0 8px; }
+/* HISTORY ANNOTATION */
+.history-dots-btn { background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 6px; color: var(--gray-text); font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+.history-dots-btn:active { background: var(--gray-bg); }
+.history-annotation { border-top: 1px solid var(--gray-border); padding: 8px 13px; display: flex; align-items: flex-start; gap: 8px; background: var(--gray-bg); border-radius: 0 0 11px 11px; }
+.history-annotation-icon { font-size: 0.85rem; flex-shrink: 0; margin-top: 1px; }
+.history-annotation-text { font-size: 0.75rem; color: #555; line-height: 1.4; }
+.history-annotation-text b { color: var(--dark); font-weight: 600; }
+/* ANNOTATION SHEET */
+.annot-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; display: none; align-items: flex-end; justify-content: center; }
+.annot-overlay.open { display: flex; }
+.annot-sheet { background: white; border-radius: 24px 24px 0 0; width: 100%; max-width: 520px; padding: 0 0 calc(24px + var(--safe-bottom)); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); max-height: 92dvh; overflow-y: auto; }
+.annot-overlay.open .annot-sheet { transform: translateY(0); }
+.annot-handle { width: 40px; height: 4px; background: #ddd; border-radius: 2px; margin: 12px auto 0; }
+.annot-head { padding: 14px 20px 12px; border-bottom: 1px solid #f0f0f0; }
+.annot-head h2 { font-size: 1rem; font-weight: 800; color: var(--dark); }
+.annot-head p { font-size: 0.78rem; color: var(--gray-text); margin-top: 2px; }
+.annot-menu-item { padding: 14px 20px; display: flex; align-items: center; gap: 14px; cursor: pointer; border-bottom: 1px solid #f5f5f5; }
+.annot-menu-item:active { background: var(--gray-bg); }
+.annot-menu-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+.annot-menu-label { font-size: 0.92rem; font-weight: 700; color: var(--dark); }
+.annot-menu-desc { font-size: 0.75rem; color: var(--gray-text); margin-top: 1px; }
+.annot-cancel { padding: 14px 20px; text-align: center; font-size: 0.9rem; color: var(--gray-text); cursor: pointer; }
+.annot-rep-item { padding: 12px 20px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #f5f5f5; }
+.annot-rep-item:active { background: var(--gray-bg); }
+.annot-rep-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--blue-light); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: var(--blue-mid); flex-shrink: 0; }
+.annot-rep-name { font-size: 0.9rem; font-weight: 600; color: var(--dark); }
+.annot-rep-badge { margin-left: auto; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #fef3c7; color: #92400e; }
+.annot-note-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.annot-note-body textarea { border: 1.5px solid var(--gray-border); border-radius: 11px; padding: 11px 13px; font-size: 0.92rem; outline: none; width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif; resize: none; min-height: 100px; color: var(--dark); }
+.annot-note-body textarea:focus { border-color: var(--blue-mid); }
+.annot-submit-btn { width: 100%; padding: 13px; border: none; border-radius: 13px; font-size: 0.95rem; font-weight: 700; cursor: pointer; color: white; background: linear-gradient(135deg, #1565c0, #1e88e5); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif; }
+
+/* MONITOR CARD */
+.monitor-card { background: white; border-radius: 20px; padding: 18px 18px 14px; box-shadow: 0 2px 10px rgba(0,0,0,0.07); max-height: 420px; overflow-y: auto; }
+.monitor-section { margin-bottom: 14px; }
+.monitor-section:last-child { margin-bottom: 0; }
+.monitor-section-title { font-size: 0.68rem; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: var(--gray-text); margin-bottom: 8px; }
+.monitor-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f5f5f5; font-size: 0.8rem; }
+.monitor-row:last-child { border-bottom: none; }
+.monitor-label { color: var(--gray-text); font-weight: 500; }
+.monitor-value { font-weight: 700; color: var(--dark); text-align: right; max-width: 60%; word-break: break-word; }
+.monitor-value.ok { color: #16a34a; }
+.monitor-value.fail { color: #dc2626; }
+.monitor-value.skip { color: #92400e; }
+.monitor-value.pending { color: var(--gray-text); }
+.monitor-divider { height: 1px; background: #f0f0f0; margin: 12px 0; }
+.mon-attempts-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-top: 8px; }
+.mon-attempt-item { border: 1px solid var(--gray-border); border-radius: 10px; padding: 8px 11px; display: flex; flex-direction: column; gap: 2px; font-size: 0.75rem; }
+.mon-attempt-item.result-ok   { border-left: 3px solid #16a34a; }
+.mon-attempt-item.result-skip { border-left: 3px solid #92400e; }
+.mon-attempt-item.result-fail { border-left: 3px solid #dc2626; }
+.mon-attempt-row { display: flex; justify-content: space-between; gap: 8px; }
+.mon-attempt-ts  { color: var(--gray-text); font-size: 0.7rem; }
+.mon-attempt-result-label { font-weight: 700; }
+.mon-attempt-result-label.ok   { color: #16a34a; }
+.mon-attempt-result-label.skip { color: #92400e; }
+.mon-attempt-result-label.fail { color: #dc2626; }
+.mon-attempt-reason-text { color: #555; font-size: 0.72rem; }
+.mon-attempts-filter { display: flex; gap: 6px; margin-bottom: 8px; align-items: center; flex-wrap: wrap; }
+.mon-attempts-filter-btn { font-size: 0.68rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; border: 1.5px solid var(--gray-border); background: white; color: var(--gray-text); cursor: pointer; }
+.mon-attempts-filter-btn.active { background: var(--blue-light); border-color: var(--blue-mid); color: var(--blue-mid); }
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 150; display: none; align-items: flex-end; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal-sheet { background: white; border-radius: 24px 24px 0 0; width: 100%; max-width: 520px; padding: 0 0 calc(24px + var(--safe-bottom)); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); max-height: 92dvh; overflow-y: auto; }
+.modal-overlay.open .modal-sheet { transform: translateY(0); }
+.modal-handle { width: 40px; height: 4px; background: #ddd; border-radius: 2px; margin: 12px auto 0; }
+.modal-head { padding: 14px 20px 12px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+.modal-head h2 { font-size: 1.05rem; font-weight: 800; color: var(--dark); }
+.modal-assignee { padding: 10px 20px 12px; border-bottom: 1px solid #f0f0f0; font-size: 0.8rem; color: var(--gray-text); }
+.modal-assignee span { font-weight: 700; color: var(--dark); }
+.modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 13px; }
+.field-group { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: var(--gray-text); }
+.field-input { border: 1.5px solid var(--gray-border); border-radius: 11px; padding: 11px 13px; font-size: 0.95rem; font-weight: 500; outline: none; color: var(--dark); width: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif; transition: border-color 0.2s; }
+.field-input:focus { border-color: var(--blue-mid); }
+.field-row { display: flex; gap: 10px; }
+.field-row .field-group { flex: 1; }
+.modal-confirm-btn { width: 100%; padding: 14px; border: none; border-radius: 13px; font-size: 1rem; font-weight: 700; cursor: pointer; color: white; transition: opacity 0.15s, transform 0.1s; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif; }
+.modal-confirm-btn:active { transform: scale(0.98); opacity: 0.88; }
+.modal-cancel-btn { width: 100%; padding: 11px; border: none; background: none; font-size: 0.9rem; font-weight: 600; color: var(--gray-text); cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, sans-serif; }
+/* DRAWER */
+.drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; display: none; opacity: 0; transition: opacity 0.25s; }
+.drawer-overlay.open { display: block; opacity: 1; }
+.drawer { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 24px 24px 0 0; z-index: 101; padding: 0 0 calc(20px + var(--safe-bottom)); transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); max-height: 92dvh; overflow-y: auto; }
+.drawer.open { transform: translateY(0); }
+.drawer-handle { width: 40px; height: 4px; background: #ddd; border-radius: 2px; margin: 12px auto 0; }
+.drawer-head { padding: 14px 20px 16px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center; }
+.drawer-head h2 { font-size: 1.05rem; font-weight: 800; color: var(--dark); }
+.close-btn { background: var(--gray-bg); border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center; color: #555; }
+.drawer-body { padding: 20px; display: flex; flex-direction: column; gap: 24px; }
+.drawer-section h3 { font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--gray-text); margin-bottom: 12px; }
+.section-desc { font-size: 0.82rem; color: #555; margin-bottom: 14px; line-height: 1.5; }
+.divider { height: 1px; background: #f0f0f0; }
+.name-rows { display: flex; flex-direction: column; gap: 8px; }
+.name-row { display: flex; gap: 8px; align-items: center; cursor: grab; }
+.name-row.dragging { opacity: 0.4; }
+.name-row.drag-over { outline: 2px dashed var(--blue-mid); border-radius: 10px; }
+.drag-handle { color: #ccc; font-size: 1.1rem; cursor: grab; padding: 0 2px; user-select: none; flex-shrink: 0; }
+.name-row input { flex: 1; border: 1.5px solid var(--gray-border); border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; font-weight: 600; outline: none; width: 100%; color: var(--dark); transition: border-color 0.2s; }
+.name-row input:focus { border-color: var(--blue-mid); }
+.remove-rep-btn { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #fca5a5; background: #fff5f5; color: #dc2626; font-size: 1rem; cursor: pointer; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.add-rep-btn { width: 100%; padding: 11px; border-radius: 11px; border: 2px dashed var(--gray-border); background: white; color: var(--blue-mid); font-size: 0.9rem; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.test-notif-btn { width: 100%; margin-top: 12px; padding: 12px; border-radius: 11px; border: 2px solid var(--blue-mid); background: var(--blue-light); color: var(--blue-mid); font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+.sub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.sub-btn { padding: 12px 6px; border-radius: 12px; border: 2px solid var(--gray-border); background: white; font-size: 0.85rem; font-weight: 700; cursor: pointer; color: #555; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.sub-btn .sub-icon { font-size: 1.2rem; }
+.sub-btn .sub-status { font-size: 0.65rem; font-weight: 600; color: var(--gray-text); }
+.sub-btn.subscribed { background: var(--green-bg); border-color: #16a34a; color: var(--green); }
+.sub-btn.subscribed .sub-status { color: #16a34a; }
+.rotation-btns { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; }
+.rot-btn { padding: 11px 6px; border-radius: 11px; border: 2px solid var(--gray-border); background: white; font-size: 0.88rem; font-weight: 600; cursor: pointer; color: #555; }
+.rot-btn.sel-store { background: var(--blue-light); border-color: var(--blue-mid); color: var(--blue); }
+.ondeck-row { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 600; color: var(--dark); cursor: pointer; }
+.ondeck-row input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--blue); }
+.save-btn { background: var(--blue); color: white; border: none; border-radius: 13px; padding: 14px; font-size: 1rem; font-weight: 700; cursor: pointer; width: 100%; }
+.toast { position: fixed; bottom: calc(28px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(70px); background: #1a2e4a; color: white; padding: 11px 20px; border-radius: 50px; font-size: 0.88rem; font-weight: 600; transition: transform 0.25s ease; pointer-events: none; white-space: nowrap; z-index: 200; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="app-header">
+    <h1>Lead Rotation</h1>
+    <div class="header-right">
+      <div class="sync-dot" id="sync-dot"></div>
+      <a href="/photos" class="photos-link">Photos</a>
+      <button class="settings-btn" onclick="openDrawer()">&#9881; Settings</button>
+    </div>
+  </div>
+
+  <div class="notif-banner" id="notif-banner">
+    <span>&#128276; <b>Enable notifications</b> to get alerted when you're up next.</span>
+    <button onclick="openDrawer(); closeNotifBanner()">Set Up</button>
+  </div>
+
+  <div class="notif-banner" id="install-banner" style="background:#e8f4fd;border-bottom-color:#90caf9;color:#1565c0;display:none;">
+    <span>&#128242; <b>Add to Home Screen</b> for the best experience.</span>
+    <button style="background:#1565c0;" onclick="triggerInstall()">Install</button>
+    <button onclick="dismissInstall()" style="background:none;color:#1565c0;border:1px solid #1565c0;margin-left:4px;">&#x2715;</button>
+  </div>
+
+  <div class="cards-wrap">
+    <div class="card store">
+      <div class="channel-tag">Online Store</div>
+      <div class="rep-now" id="store-name">&#8212;</div>
+      <div class="up-next">Up next: <b id="store-next">&#8212;</b></div>
+      <div class="notif-pill off" id="store-pill">&#128277; Notifications off</div>
+      <button class="assign-btn" onclick="openLeadModal()">&#10003; Mark as Assigned</button>
+    </div>
+
+    <div class="history-card">
+      <div class="history-header">
+        <span class="history-title">&#128203; Notification History</span>
+        <button class="history-clear" onclick="clearHistory()">Clear</button>
+      </div>
+      <div class="history-search-wrap">
+        <input class="history-search" id="hist-search" type="text" placeholder="Search rep, order #, customer, item..." oninput="applyHistoryFilter()"/>
+        <button class="history-search-clear" id="hist-search-clear" onclick="clearHistorySearch()">&#x2715;</button>
+      </div>
+      <div class="history-filter">
+        <label>From</label>
+        <input type="date" id="hist-from" onchange="applyHistoryFilter()"/>
+        <label>To</label>
+        <input type="date" id="hist-to" onchange="applyHistoryFilter()"/>
+        <button class="history-filter-clear" onclick="clearHistoryFilter()">Reset</button>
+      </div>
+      <div class="history-list" id="history-list">
+        <div class="history-empty">No notifications sent yet.</div>
+      </div>
+    </div>
+
+    <div class="monitor-card" id="monitor-card">
+      <div class="monitor-section">
+        <div class="monitor-section-title">&#128268; Last Webhook Attempt</div>
+        <div class="monitor-row"><span class="monitor-label">Time</span><span class="monitor-value pending" id="mon-attempt-time">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Order</span><span class="monitor-value pending" id="mon-attempt-order">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Payment Status</span><span class="monitor-value pending" id="mon-attempt-status">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Result</span><span class="monitor-value pending" id="mon-attempt-result">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Reason</span><span class="monitor-value pending" id="mon-attempt-reason">&#8212;</span></div>
+      </div>
+      <div class="monitor-divider"></div>
+      <div class="monitor-section">
+        <div class="monitor-section-title">&#9989; Last Successful Run</div>
+        <div class="monitor-row"><span class="monitor-label">Time</span><span class="monitor-value pending" id="mon-run-time">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Order</span><span class="monitor-value pending" id="mon-run-order">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Rep Notified</span><span class="monitor-value pending" id="mon-run-rep">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Sub Found</span><span class="monitor-value pending" id="mon-run-sub">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Push Sent</span><span class="monitor-value pending" id="mon-run-push">&#8212;</span></div>
+        <div class="monitor-row"><span class="monitor-label">Next Up</span><span class="monitor-value pending" id="mon-run-next">&#8212;</span></div>
+      </div>
+      <div class="monitor-divider"></div>
+      <div class="monitor-section">
+        <div class="monitor-section-title">&#128203; Recent Webhook Attempts</div>
+        <div class="mon-attempts-filter">
+          <button class="mon-attempts-filter-btn active" id="maf-all" onclick="setAttemptsFilter('all')">All</button>
+          <button class="mon-attempts-filter-btn" id="maf-qualified" onclick="setAttemptsFilter('qualified')">Qualified</button>
+          <button class="mon-attempts-filter-btn" id="maf-skipped" onclick="setAttemptsFilter('skipped')">Skipped</button>
+          <button class="mon-attempts-filter-btn" id="maf-nodata" onclick="setAttemptsFilter('nodata')">No Customer Data</button>
+        </div>
+        <div class="mon-attempts-list" id="mon-attempts-list">
+          <div style="font-size:0.78rem;color:var(--gray-text);padding:6px 0;">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Annotation Sheet -->
+<div class="annot-overlay" id="annot-overlay" onclick="handleAnnotBg(event)">
+  <div class="annot-sheet" id="annot-sheet">
+    <div class="annot-handle"></div>
+    <div class="annot-head">
+      <h2 id="annot-title">Order Note</h2>
+      <p id="annot-sub">What happened with this order?</p>
+    </div>
+    <div id="annot-content"></div>
+  </div>
+</div>
+
+<!-- Lead Modal -->
+<div class="modal-overlay" id="lead-modal" onclick="handleModalBg(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-head">
+      <h2>Assign Online Store Lead</h2>
+      <button class="close-btn" onclick="closeLeadModal()">&#x2715;</button>
+    </div>
+    <div class="modal-assignee">Assigning to: <span id="modal-assignee">&#8212;</span></div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">Customer Name</label>
+          <input class="field-input" id="f-name" placeholder="e.g. Maria Torres" type="text"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Order Number</label>
+          <input class="field-input" id="f-order" placeholder="e.g. #13873" type="text"/>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label">Phone Number</label>
+          <input class="field-input" id="f-phone" placeholder="(310) 555-0192" type="tel"/>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Order Value</label>
+          <input class="field-input" id="f-amount" placeholder="$280" type="text"/>
+        </div>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Product / Item Details</label>
+        <input class="field-input" id="f-product" placeholder="e.g. Jordan 1 Retro, Size 10" type="text"/>
+      </div>
+      <button class="modal-confirm-btn" id="modal-confirm-btn" onclick="confirmAssign()" style="background:linear-gradient(135deg,#1565c0,#1e88e5)">&#10003; Assign Lead</button>
+      <button class="modal-cancel-btn" onclick="closeLeadModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Drawer -->
+<div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-head">
+    <h2>Settings</h2>
+    <button class="close-btn" onclick="closeDrawer()">&#x2715;</button>
+  </div>
+  <div class="drawer-body">
+    <div class="drawer-section">
+      <h3>Sales Associates</h3>
+      <p class="section-desc">Drag &#x22BF; to reorder. Tap a name to edit it.</p>
+      <div class="name-rows" id="name-rows"></div>
+      <button class="add-rep-btn" onclick="addRep()">+ Add Sales Associate</button>
+    </div>
+    <div class="divider"></div>
+    <div class="drawer-section">
+      <h3>My Notifications</h3>
+      <p class="section-desc">Each person opens this app on <strong>their own phone</strong> and taps their name. Tap Allow when prompted.</p>
+      <div class="sub-grid" id="sub-grid"></div>
+      <button class="test-notif-btn" id="test-notif-btn" onclick="sendTestNotification()" style="display:none">&#128276; Send Me a Test Notification</button>
+    </div>
+    <div class="divider"></div>
+    <div class="drawer-section">
+      <h3>Online Store &#8212; Who's up next?</h3>
+      <div class="rotation-btns" id="store-rot-btns"></div>
+    </div>
+    <div class="divider"></div>
+    <div class="drawer-section">
+      <h3>On-Deck Notifications</h3>
+      <p class="section-desc">When a lead is assigned, automatically notify the next rep they're on deck.</p>
+      <label class="ondeck-row">
+        <input type="checkbox" id="ondeck-toggle" onchange="localStorage.setItem('lr_ondeck', this.checked)"/>
+        Notify next rep they're on deck
+      </label>
+    </div>
+    <button class="save-btn" onclick="saveSettings()">Save Changes</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CORE CONFIG
+// ═══════════════════════════════════════════════════════
+var DB_URL     = 'https://sales-rotation-44d0d-default-rtdb.firebaseio.com';
+var VAPID_PUB  = 'BG9ayPRzg_qaRlgCZApYNjl3imTR1cwejEGejKSzyZoWhgA8nHvbIr9Wb2gXwicAtm2qEzczJQmjF2zDbQ5Z4qM';
+var NOTIFY_URL = '/.netlify/functions/notify';
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// subs is now stored as a NAME→subscription object in Firebase
+// e.g. { "Marcus": {endpoint:..., keys:...}, "Diana": {...} }
+// This eliminates ALL array-index bugs permanently.
+// ═══════════════════════════════════════════════════════
+var state = { reps: [], subs: {}, store: 0 };
+var draft = {};
+
+// myRepName: the name of the rep on THIS device (stored in localStorage)
+var myRepName = localStorage.getItem('lr_my_rep_name') || null;
+
+var eventSource  = null;
+var writeTimeout = null;
+var pendingCh    = null;
+
+function $(id) { return document.getElementById(id); }
+
+// ── Helpers ────────────────────────────────────────────
+function toArr(val, len) {
+  if (!val) return new Array(len).fill(null);
+  if (Array.isArray(val)) return val.slice();
+  var arr = new Array(len).fill(null);
+  Object.keys(val).forEach(function(k) {
+    var i = parseInt(k, 10);
+    if (!isNaN(i) && i >= 0 && i < len) arr[i] = val[k];
+  });
+  return arr;
+}
+
+// Get subscription for a rep by name
+function getSubForRep(name) {
+  if (!name) return null;
+  return (state.subs && state.subs[name]) || null;
+}
+
+// Check if THIS device's rep has a subscription
+function mySubExists() {
+  return !!(myRepName && getSubForRep(myRepName));
+}
+
+window.onerror = function(msg) { toast('JS Error: ' + msg); return false; };
+
+// ── Init ───────────────────────────────────────────────
+(function init() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function(){});
+  fetchState();
+  subscribeSSE();
+  fetchMonitor();
+  setInterval(fetchMonitor, 15000);
+  var cb = $('ondeck-toggle');
+  if (cb) cb.checked = localStorage.getItem('lr_ondeck') !== 'false';
+})();
+
+function checkNotifBanner() {
+  if (!mySubExists() && 'Notification' in window) {
+    $('notif-banner').classList.add('show');
+  } else {
+    $('notif-banner').classList.remove('show');
+  }
+}
+function closeNotifBanner() { $('notif-banner').classList.remove('show'); }
+
+// ── Firebase ───────────────────────────────────────────
+async function fetchState() {
+  try {
+    var res  = await fetch(DB_URL + '/rotation.json');
+    var data = await res.json();
+    applyData(data);
+  } catch(e) { setSyncStatus('error'); }
+}
+
+function applyData(data) {
+  if (!data) return;
+
+  // reps: normalize to array
+  if (data.reps !== undefined) {
+    var repCount = Array.isArray(data.reps)
+      ? data.reps.length
+      : Object.keys(data.reps).length;
+    state.reps = toArr(data.reps, repCount);
+  }
+
+  // subs: stored as name→sub object (new format) OR legacy array
+  if (data.subs !== undefined) {
+    if (data.subs && !Array.isArray(data.subs) && typeof data.subs === 'object') {
+      // Check if it looks like a name-keyed object (keys are not all numbers)
+      var keys = Object.keys(data.subs);
+      var isNameKeyed = keys.length > 0 && isNaN(parseInt(keys[0]));
+      if (isNameKeyed) {
+        state.subs = data.subs; // name→sub object
+      } else {
+        // Legacy numeric array from Firebase — migrate to name-keyed
+        var legacySubs = toArr(data.subs, state.reps.length);
+        state.subs = {};
+        legacySubs.forEach(function(sub, i) {
+          if (sub && state.reps[i]) state.subs[state.reps[i]] = sub;
+        });
+        // Write migrated format back to Firebase
+        writeState({ subs: state.subs });
+      }
+    } else if (Array.isArray(data.subs)) {
+      // Legacy array format — migrate
+      state.subs = {};
+      data.subs.forEach(function(sub, i) {
+        if (sub && state.reps[i]) state.subs[state.reps[i]] = sub;
+      });
+      writeState({ subs: state.subs });
+    } else {
+      state.subs = {};
+    }
+  }
+
+  if (data.store !== undefined) state.store = data.store;
+
+  render();
+  renderHistory(data.history);
+  if (data.last_attempt || data.last_run) renderMonitor(data.last_attempt, data.last_run);
+  checkNotifBanner();
+  // Refresh sub-grid if drawer is open
+  if ($('drawer').classList.contains('open')) {
+    draft.subs = state.subs;
+    renderSubGrid();
+  }
+}
+
+async function writeState(partial) {
+  clearTimeout(writeTimeout);
+  writeTimeout = setTimeout(async function() {
+    try {
+      await fetch(DB_URL + '/rotation.json', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(partial)
+      });
+    } catch(e) { setSyncStatus('error'); }
+  }, 100);
+}
+
+async function writeStateNow(partial) {
+  await fetch(DB_URL + '/rotation.json', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(partial)
+  });
+}
+
+function subscribeSSE() {
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource(DB_URL + '/rotation.json');
+  eventSource.addEventListener('put',   function(e) { tryApplySSE(e); });
+  eventSource.addEventListener('patch', function(e) { tryApplySSE(e); });
+  eventSource.onerror = function() { setSyncStatus('offline'); setTimeout(subscribeSSE, 5000); };
+}
+function tryApplySSE(e) {
+  try {
+    var parsed = JSON.parse(e.data);
+    if (parsed && parsed.data) applyData(parsed.data);
+  } catch(err) {}
+  setSyncStatus('online');
+}
+function setSyncStatus(s) {
+  $('sync-dot').className = 'sync-dot' + (s === 'online' ? '' : ' ' + s);
+}
+
+// ── Render ─────────────────────────────────────────────
+function render() {
+  var reps = state.reps, n = reps.length;
+  if (!n) return;
+  var cs = (state.store || 0) % n;
+  var currentRep = reps[cs];
+  var nextRep    = reps[(cs + 1) % n];
+  $('store-name').textContent = currentRep || '—';
+  $('store-next').textContent = nextRep    || '—';
+  setPill('store-pill', !!(getSubForRep(currentRep)));
+}
+function setPill(id, on) {
+  var el = $(id);
+  el.textContent = on ? '🔔 Notifications on' : '🔕 Notifications off';
+  el.className   = 'notif-pill ' + (on ? 'on' : 'off');
+}
+
+// ── History ────────────────────────────────────────────
+var _allHistoryEntries = [];
+
+function renderHistory(history) {
+  if (!history || typeof history !== 'object' || !Object.keys(history).length) {
+    _allHistoryEntries = [];
+  } else {
+    _allHistoryEntries = Object.entries(history)
+      .filter(function(e) { return e[1] && e[1].ts; })
+      .map(function(e) { var h = Object.assign({}, e[1]); h._key = e[0]; return h; })
+      .sort(function(a, b) { return (b.ts || 0) - (a.ts || 0); })
+      .slice(0, 100);
+  }
+  applyHistoryFilter();
+}
+
+function applyHistoryFilter() {
+  var list = $('history-list');
+  if (!list) return;
+  var fromVal = $('hist-from') && $('hist-from').value;
+  var toVal   = $('hist-to')   && $('hist-to').value;
+  var fromTs  = fromVal ? new Date(fromVal).setHours(0,0,0,0)   : null;
+  var toTs    = toVal   ? new Date(toVal).setHours(23,59,59,999) : null;
+  var searchEl = document.getElementById("hist-search");
+  var searchTerm = searchEl ? searchEl.value.trim().toLowerCase() : "";
+  var clearBtn = document.getElementById("hist-search-clear");
+  if (clearBtn) clearBtn.className = "history-search-clear" + (searchTerm ? " show" : "");
+
+  var entries = _allHistoryEntries.filter(function(h) {
+    if (fromTs && h.ts < fromTs) return false;
+    if (toTs   && h.ts > toTs)   return false;
+    if (searchTerm) {
+      var hay = [h.rep||"",h.orderNum||"",h.customer||"",h.amount||"",h.items||"",h.trigger||"",h.annotation?h.annotation.text.replace(/<[^>]+>/g,""):""].join(" ").toLowerCase();
+      if (hay.indexOf(searchTerm) === -1) return false;
+    }
+    return true;
+  });
+
+  if (!entries.length) {
+    list.innerHTML = '<div class="history-empty">' + (_allHistoryEntries.length ? 'No results for that date range.' : 'No notifications sent yet.') + '</div>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(function(h) {
+    var item = document.createElement('div');
+    item.className = 'history-item type-' + (h.type || 'manual');
+    var d = new Date(h.ts);
+    var timeStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    var badge = h.type === 'shopify'
+      ? '<span class="history-badge shopify">Shopify</span>'
+      : '<span class="history-badge manual">Manual</span>';
+    var orderLink = (h.orderId && h.orderNum) ? '<a href="https://admin.shopify.com/store/showroomla/orders/' + h.orderId + '" target="_blank" style="color:var(--blue-mid);text-decoration:none;font-weight:700;">' + h.orderNum + '</a>' : (h.orderNum || null);
+    var detail = [];
+    if (orderLink) detail.push('Order ' + orderLink);
+    if (h.customer) detail.push(h.customer);
+    if (h.amount)   detail.push(h.amount);
+    if (h.items)    detail.push(h.items);
+    if (h.trigger)  detail.push('Trigger: ' + h.trigger);
+    var annotHtml = '';
+    if (h.annotation) {
+      var aIcon = h.annotation.type === 'reassign' ? '⚠️' : h.annotation.type === 'already' ? '✅' : '📝';
+      annotHtml = '<div class="history-annotation"><span class="history-annotation-icon">' + aIcon + '</span><span class="history-annotation-text">' + h.annotation.text + '</span></div>';
+    }
+    item.innerHTML =
+      '<div class="history-row1"><span class="history-rep">' + (h.rep || '—') + '</span><div style="display:flex;align-items:center;gap:4px">' + badge + '<button class="history-dots-btn" onclick="openAnnotSheet(\'' + h._key + '\',\'' + (h.rep || '') + '\',\'' + (h.orderNum || '') + '\')">&#8943;</button></div></div>' +
+      (detail.length ? '<div class="history-detail">' + detail.join(' · ') + '</div>' : '') +
+      '<div class="history-time">' + timeStr + '</div>' +
+      (h.orderId ? '<a href="https://admin.shopify.com/store/showroomla/orders/' + h.orderId + '" target="_blank" style="display:inline-block;margin-top:6px;font-size:0.75rem;font-weight:700;color:var(--blue-mid);text-decoration:none;">View Order \u2192</a>' : '');
+    list.appendChild(item);
+    if (annotHtml) {
+      item.insertAdjacentHTML('beforeend', annotHtml);
+    }
+  });
+}
+
+function clearHistorySearch() {
+  var el = document.getElementById("hist-search"); if (el) el.value = "";
+  applyHistoryFilter();
+}
+
+function clearHistoryFilter() {
+  var f = $('hist-from'); if (f) f.value = '';
+  var t = $('hist-to');   if (t) t.value = '';
+  applyHistoryFilter();
+}
+
+function addHistoryEntry(entry) {
+  var key = 'history/' + Date.now();
+  var patch = {};
+  patch[key] = entry;
+  fetch(DB_URL + '/rotation.json', {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch)
+  }).catch(function() {});
+}
+
+function clearHistory() {
+  if (!confirm('Clear all notification history?')) return;
+  fetch(DB_URL + '/rotation/history.json', { method: 'DELETE' })
+    .then(function() { renderHistory(null); toast('History cleared'); })
+    .catch(function() { toast('Could not clear history'); });
+}
+
+// ── Lead Modal ─────────────────────────────────────────
+function openLeadModal() {
+  var n    = state.reps.length;
+  var curr = (state.store || 0) % n;
+  $('modal-assignee').textContent = state.reps[curr] || '—';
+  ['f-name', 'f-order', 'f-phone', 'f-amount', 'f-product'].forEach(function(id) { $(id).value = ''; });
+  $('lead-modal').classList.add('open');
+  setTimeout(function() { $('f-name').focus(); }, 350);
+}
+function handleModalBg(e) { if (e.target === $('lead-modal')) closeLeadModal(); }
+function closeLeadModal() { $('lead-modal').classList.remove('open'); }
+
+async function confirmAssign() {
+  var n    = state.reps.length;
+  var curr = (state.store || 0) % n;
+  var name = state.reps[curr];
+
+  var custName  = $('f-name').value.trim();
+  var orderNum  = $('f-order').value.trim();
+  var phone     = $('f-phone').value.trim();
+  var amount    = $('f-amount').value.trim();
+  var product   = $('f-product').value.trim();
+
+  var lines = [];
+  if (orderNum) lines.push('Order: ' + orderNum);
+  if (custName) lines.push('Customer: ' + custName);
+  if (phone)    lines.push('Phone: ' + phone);
+  if (amount)   lines.push('Value: ' + amount);
+  if (product)  lines.push('Items: ' + product);
+  lines.push('Channel: Online Store');
+  var notifBody = lines.join('\n') || 'New Online Store lead assigned to you.';
+
+  closeLeadModal();
+
+  await sendPushToRep(name, name + ' — new Online Store lead!', notifBody);
+
+  addHistoryEntry({ type: 'manual', rep: name, orderNum: orderNum || null, customer: custName || null, amount: amount || null, items: product || null, ts: Date.now() });
+
+  // Advance rotation
+  state.store = (curr + 1) % n;
+  writeState({ store: state.store });
+  render();
+
+  // On-deck
+  if (localStorage.getItem('lr_ondeck') !== 'false') {
+    var nextName = state.reps[state.store % n];
+    setTimeout(function() {
+      sendPushToRep(nextName, "You're On Deck — Online Store", nextName + ", you're up next. Get ready!");
+    }, 1500);
+  }
+  toast(name + ' notified — ' + state.reps[state.store % n] + ' is on deck');
+}
+
+// ── Push ───────────────────────────────────────────────
+function urlB64ToUint8(b64) {
+  var pad = '='.repeat((4 - b64.length % 4) % 4);
+  var raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(Array.from(raw).map(function(c) { return c.charCodeAt(0); }));
+}
+
+async function sendPushToRep(repName, title, body) {
+  var sub = getSubForRep(repName);
+  if (!sub) return;
+  try {
+    var res = await fetch(NOTIFY_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscription: sub, title: title, body: body })
+    });
+    if (res.status === 410) {
+      // Expired — remove from Firebase by name
+      delete state.subs[repName];
+      var patch = {};
+      patch['subs/' + repName] = null;
+      writeState(patch);
+      render();
+      if ($('drawer').classList.contains('open')) renderSubGrid();
+    }
+  } catch(e) {}
+}
+
+// ── Enable notifications ───────────────────────────────
+async function enableNotificationsFor(repName) {
+  if (!('PushManager' in window)) { toast('Push not supported on this browser'); return; }
+  try {
+    var perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Notifications blocked — check your phone settings'); return; }
+
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlB64ToUint8(VAPID_PUB)
+    });
+    var subJSON = sub.toJSON();
+
+    // Save by name to Firebase — immune to index changes forever
+    if (!state.subs) state.subs = {};
+    state.subs[repName] = subJSON;
+
+    // Write ONLY this rep's sub — no risk of overwriting others
+    var patch = {};
+    patch['subs/' + repName] = subJSON;
+    await writeStateNow(patch);
+
+    // Remember on this device
+    myRepName = repName;
+    localStorage.setItem('lr_my_rep_name', repName);
+
+    closeNotifBanner();
+    toast('🔔 Notifications on for ' + repName);
+    renderSubGrid();
+    render();
+  } catch(err) {
+    console.error(err);
+    toast('Could not enable: ' + err.message);
+  }
+}
+
+// ── Settings ───────────────────────────────────────────
+function openDrawer() {
+  try {
+    draft = { reps: state.reps.slice(), subs: state.subs, store: state.store || 0 };
+    renderNameRows();
+    renderSubGrid();
+    renderRotBtns();
+    var cb = $('ondeck-toggle');
+    if (cb) cb.checked = localStorage.getItem('lr_ondeck') !== 'false';
+    $('drawer').classList.add('open');
+    $('overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  } catch(err) { toast('Error: ' + err.message); }
+}
+function closeDrawer() {
+  $('drawer').classList.remove('open');
+  $('overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function renderNameRows() {
+  var container = $('name-rows');
+  container.innerHTML = '';
+  draft.reps.forEach(function(name, i) {
+    var row = document.createElement('div');
+    row.className = 'name-row'; row.draggable = true; row.dataset.idx = i;
+    row.addEventListener('dragstart', function(e) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', String(i));
+      setTimeout(function() { row.classList.add('dragging'); }, 0);
+    });
+    row.addEventListener('dragend',  function() { row.classList.remove('dragging'); });
+    row.addEventListener('dragover', function(e) { e.preventDefault(); row.classList.add('drag-over'); });
+    row.addEventListener('dragleave',function() { row.classList.remove('drag-over'); });
+    row.addEventListener('drop', function(e) {
+      e.preventDefault(); row.classList.remove('drag-over');
+      var from = parseInt(e.dataTransfer.getData('text/plain'));
+      var to   = parseInt(row.dataset.idx);
+      if (from === to) return;
+      var r = draft.reps.splice(from, 1)[0]; draft.reps.splice(to, 0, r);
+      if (draft.store === from) draft.store = to;
+      else if (from < to && draft.store > from && draft.store <= to) draft.store--;
+      else if (from > to && draft.store >= to  && draft.store <  from) draft.store++;
+      renderNameRows(); renderSubGrid(); renderRotBtns();
+    });
+    var handle = document.createElement('span');
+    handle.className = 'drag-handle'; handle.textContent = '⠿';
+    var input = document.createElement('input');
+    input.placeholder = 'Name ' + (i + 1); input.value = name;
+    input.addEventListener('input', function() {
+      draft.reps[i] = input.value.trim() || 'Rep ' + (i + 1);
+      renderSubGrid(); renderRotBtns();
+    });
+    var rm = document.createElement('button');
+    rm.className = 'remove-rep-btn'; rm.textContent = '−';
+    if (draft.reps.length <= 2) rm.disabled = true;
+    rm.onclick = function() { removeRep(i); };
+    row.appendChild(handle); row.appendChild(input); row.appendChild(rm);
+    container.appendChild(row);
+  });
+}
+
+function addRep() {
+  draft.reps.push('Rep ' + (draft.reps.length + 1));
+  renderNameRows(); renderSubGrid(); renderRotBtns();
+}
+
+function removeRep(index) {
+  if (draft.reps.length <= 2) { toast('Need at least 2 reps'); return; }
+  draft.reps.splice(index, 1);
+  if (draft.store >= draft.reps.length) draft.store = 0;
+  renderNameRows(); renderSubGrid(); renderRotBtns();
+}
+
+function renderSubGrid() {
+  var c = $('sub-grid'); c.innerHTML = '';
+  var subs = draft.subs || state.subs || {};
+  draft.reps.forEach(function(name) {
+    var hasSub = !!(subs[name]);
+    var isMe   = (name === myRepName);
+    var btn    = document.createElement('button');
+    btn.className = 'sub-btn' + (hasSub ? ' subscribed' : '');
+    btn.innerHTML =
+      '<span class="sub-icon">' + (hasSub ? '&#x2705;' : '&#x1F514;') + '</span>' +
+      '<span>' + name + '</span>' +
+      '<span class="sub-status">' + (hasSub ? (isMe ? 'This device' : 'Subscribed') : 'Tap to enable') + '</span>';
+    btn.onclick = function() { enableNotificationsFor(name); };
+    c.appendChild(btn);
+  });
+  var tb = $('test-notif-btn');
+  if (tb) tb.style.display = mySubExists() ? 'block' : 'none';
+}
+
+function renderRotBtns() {
+  var c = $('store-rot-btns'); c.innerHTML = '';
+  draft.reps.forEach(function(name, i) {
+    var btn = document.createElement('button');
+    btn.className   = 'rot-btn' + (i === draft.store ? ' sel-store' : '');
+    btn.textContent = name || 'Rep ' + (i + 1);
+    btn.onclick     = function() { draft.store = i; renderRotBtns(); };
+    c.appendChild(btn);
+  });
+}
+
+function saveSettings() {
+  state.reps  = draft.reps.slice();
+  state.store = draft.store;
+  // Clean up subs: remove entries for reps that no longer exist
+  var cleanSubs = {};
+  state.reps.forEach(function(name) {
+    if (state.subs[name]) cleanSubs[name] = state.subs[name];
+  });
+  state.subs = cleanSubs;
+  writeState({ reps: state.reps, subs: state.subs, store: state.store });
+  render(); closeDrawer();
+  toast('Saved — all devices updated');
+}
+
+async function sendTestNotification() {
+  if (!myRepName) { toast('Tap your name above first'); return; }
+  if (!mySubExists()) { toast('Tap your name again to re-enable notifications'); return; }
+  var sub = getSubForRep(myRepName);
+  try {
+    var res = await fetch(NOTIFY_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subscription: sub,
+        title: '🔔 Test — Notifications are working!',
+        body: myRepName + ", you'll get alerts like this when you're up next."
+      })
+    });
+    if (res.ok) {
+      toast('Test sent! Check your notifications');
+    } else if (res.status === 410) {
+      delete state.subs[myRepName];
+      var patch = {};
+      patch['subs/' + myRepName] = null;
+      writeState(patch);
+      renderSubGrid();
+      toast('Subscription expired — tap your name again to re-enable');
+    } else {
+      toast('Error — try again');
+    }
+  } catch(e) { toast('Could not send test — check connection'); }
+}
+
+// ── Install prompt ─────────────────────────────────────
+var _installPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault(); _installPrompt = e;
+  if (window.matchMedia('(display-mode: standalone)').matches) return;
+  var b = $('install-banner');
+  if (b) { b.style.display = 'flex'; }
+});
+function triggerInstall() {
+  if (!_installPrompt) return;
+  _installPrompt.prompt();
+  _installPrompt.userChoice.then(function() { dismissInstall(); });
+}
+function dismissInstall() {
+  var b = $('install-banner'); if (b) b.style.display = 'none'; _installPrompt = null;
+}
+window.addEventListener('appinstalled', function() { dismissInstall(); });
+
+
+// ── Monitor Card ───────────────────────────────────────
+function renderMonitor(attempt, lastRun, attempts) {
+  function fmtTime(ts) {
+    if (!ts) return '—';
+    var d = new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+      ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+  function setVal(id, text, cls) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text || '—';
+    el.className = 'monitor-value ' + (cls || 'pending');
+  }
+
+  if (attempt) {
+    setVal('mon-attempt-time',   fmtTime(attempt.ts));
+    setVal('mon-attempt-order',  attempt.order ? '#' + attempt.order : '—');
+    setVal('mon-attempt-status', attempt.financial_status || '—');
+    var resultCls = attempt.result === 'Qualified' ? 'ok' : attempt.result === 'processing' ? 'pending' : 'skip';
+    setVal('mon-attempt-result', attempt.result || '—', resultCls);
+    setVal('mon-attempt-reason', attempt.reason || '—');
+  }
+
+  if (lastRun) {
+    setVal('mon-run-time',  fmtTime(lastRun.ts));
+    setVal('mon-run-order', lastRun.order ? '#' + lastRun.order : '—');
+    setVal('mon-run-rep',   lastRun.rep || '—');
+    setVal('mon-run-sub',   lastRun.subFound ? '✅ Yes' : '❌ No', lastRun.subFound ? 'ok' : 'fail');
+    setVal('mon-run-push',  lastRun.pushOk  ? '✅ Sent' : '❌ Failed — ' + (lastRun.pushReason || ''), lastRun.pushOk ? 'ok' : 'fail');
+    // Next up in rotation
+    var reps = state.reps;
+    var n = reps && reps.length;
+    if (n) {
+      var curIdx = reps.indexOf(lastRun.rep);
+      var nextRep = curIdx >= 0 ? reps[(curIdx + 1) % n] : '—';
+      setVal('mon-run-next', nextRep, 'ok');
+    }
+  }
+
+  // Attempts list
+  renderAttemptsList(attempts || null);
+}
+
+async function fetchMonitor() {
+  try {
+    var res  = await fetch(DB_URL + '/rotation/last_attempt.json');
+    var attempt = await res.json();
+    var res2 = await fetch(DB_URL + '/rotation/last_run.json');
+    var lastRun = await res2.json();
+    var attempts = null;
+    try {
+      var res3 = await fetch(DB_URL + '/rotation/attempts.json');
+      attempts = await res3.json();
+    } catch(e) {}
+    renderMonitor(attempt, lastRun, attempts);
+  } catch(e) {}
+}
+
+// ── Annotation Sheet ───────────────────────────────────
+var _annotKey = null;
+var _annotRep = null;
+var _annotOrderNum = null;
+
+function openAnnotSheet(key, rep, orderNum) {
+  _annotKey = key;
+  _annotRep = rep;
+  _annotOrderNum = orderNum;
+  var title = $('annot-title');
+  var sub   = $('annot-sub');
+  if (title) title.textContent = orderNum ? 'Order ' + orderNum : 'Order Note';
+  if (sub)   sub.textContent   = 'Assigned to ' + (rep || '—') + ' — what happened?';
+  renderAnnotMenu();
+  $('annot-overlay').classList.add('open');
+}
+
+function handleAnnotBg(e) { if (e.target === $('annot-overlay')) closeAnnotSheet(); }
+function closeAnnotSheet() {
+  $('annot-overlay').classList.remove('open');
+  _annotKey = null; _annotRep = null; _annotOrderNum = null;
+}
+
+function renderAnnotMenu() {
+  var c = $('annot-content'); if (!c) return;
+  c.innerHTML =
+    '<div class="annot-menu-item" onclick="startAnnotReassign()">' +
+      '<div class="annot-menu-icon" style="background:#fef3c7;">&#9888;</div>' +
+      '<div><div class="annot-menu-label">Incorrectly assigned</div><div class="annot-menu-desc">Reassign to a different rep</div></div>' +
+    '</div>' +
+    '<div class="annot-menu-item" onclick="saveAnnot(\'already\',\'Already assigned to <b>' + (_annotRep || '') + '</b> — no action needed\')">' +
+      '<div class="annot-menu-icon" style="background:#dcfce7;">&#10003;</div>' +
+      '<div><div class="annot-menu-label">Already assigned</div><div class="annot-menu-desc">Rep was already handling this order</div></div>' +
+    '</div>' +
+    '<div class="annot-menu-item" onclick="renderAnnotNote()">' +
+      '<div class="annot-menu-icon" style="background:var(--blue-light);">&#9998;</div>' +
+      '<div><div class="annot-menu-label">Add a note</div><div class="annot-menu-desc">Leave a comment on this order</div></div>' +
+    '</div>' +
+    '<div class="annot-cancel" onclick="closeAnnotSheet()">Cancel</div>';
+}
+
+function startAnnotReassign() {
+  var c = $('annot-content'); if (!c) return;
+  var reps = state.reps || [];
+  var repItems = reps.map(function(name) {
+    var initials = name.split(' ').map(function(w) { return w[0]; }).join('').toUpperCase().slice(0,2);
+    var isOrig   = name === _annotRep;
+    return '<div class="annot-rep-item" onclick="saveAnnot(\'reassign\',\'Incorrectly assigned to <b>' + (_annotRep || '') + '</b> — reassigned to <b>' + name + '</b>\')">' +
+      '<div class="annot-rep-avatar">' + initials + '</div>' +
+      '<span class="annot-rep-name">' + name + '</span>' +
+      (isOrig ? '<span class="annot-rep-badge">original</span>' : '') +
+    '</div>';
+  }).join('');
+  c.innerHTML =
+    '<div style="padding:12px 20px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center;">' +
+      '<span style="font-size:0.9rem;font-weight:700;color:var(--dark);">Reassign to...</span>' +
+      '<span style="font-size:0.8rem;color:var(--gray-text);cursor:pointer;" onclick="renderAnnotMenu()">Back</span>' +
+    '</div>' +
+    repItems +
+    '<div class="annot-cancel" onclick="closeAnnotSheet()">Cancel</div>';
+}
+
+function renderAnnotNote() {
+  var c = $('annot-content'); if (!c) return;
+  c.innerHTML =
+    '<div class="annot-note-body">' +
+      '<textarea id="annot-note-input" placeholder="Add a note about this order..."></textarea>' +
+      '<button class="annot-submit-btn" onclick="submitAnnotNote()">Save Note</button>' +
+    '</div>' +
+    '<div class="annot-cancel" onclick="closeAnnotSheet()">Cancel</div>';
+  setTimeout(function() { var el = $('annot-note-input'); if (el) el.focus(); }, 100);
+}
+
+function submitAnnotNote() {
+  var el = $('annot-note-input');
+  var note = el ? el.value.trim() : '';
+  if (!note) { toast('Please enter a note'); return; }
+  saveAnnot('note', '&#128221; ' + note);
+}
+
+async function saveAnnot(type, text) {
+  if (!_annotKey) { closeAnnotSheet(); return; }
+  try {
+    var annotation = { type: type, text: text, ts: Date.now() };
+    await fetch(DB_URL + '/rotation/history/' + _annotKey + '/annotation.json', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(annotation)
+    });
+    // Update local state
+    var entry = _allHistoryEntries.find(function(h) { return h._key === _annotKey; });
+    if (entry) { entry.annotation = annotation; applyHistoryFilter(); }
+    toast('Saved');
+    closeAnnotSheet();
+  } catch(e) {
+    toast('Could not save — check connection');
+  }
+}
+
+// ── Attempts Filter ────────────────────────────────────
+var _allAttempts = null;
+var _attemptsFilter = 'all';
+
+function setAttemptsFilter(f) {
+  _attemptsFilter = f;
+  ['all','qualified','skipped','nodata'].forEach(function(k) {
+    var el = document.getElementById('maf-' + k);
+    if (el) el.className = 'mon-attempts-filter-btn' + (k === f ? ' active' : '');
+  });
+  renderAttemptsList(_allAttempts);
+}
+
+function renderAttemptsList(attempts) {
+  _allAttempts = attempts;
+  var listEl = document.getElementById('mon-attempts-list');
+  if (!listEl) return;
+  if (!attempts) {
+    listEl.innerHTML = '<div style="font-size:0.78rem;color:var(--gray-text);padding:6px 0;">No attempts yet.</div>';
+    return;
+  }
+  var items = Object.values(attempts);
+  items.sort(function(a, b) { return (b.ts || 0) - (a.ts || 0); });
+  if (_attemptsFilter === 'qualified') {
+    items = items.filter(function(a) { return a.result === 'Qualified'; });
+  } else if (_attemptsFilter === 'skipped') {
+    items = items.filter(function(a) { return a.result === 'Skipped'; });
+  } else if (_attemptsFilter === 'nodata') {
+    items = items.filter(function(a) { return a.reason && (a.reason.indexOf('prev notified') !== -1 || a.reason.indexOf('null') !== -1 || a.reason.indexOf('non-online') !== -1); });
+  }
+  items = items.slice(0, 20);
+  if (!items.length) {
+    listEl.innerHTML = '<div style="font-size:0.78rem;color:var(--gray-text);padding:6px 0;">No results.</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(function(a) {
+    var d = a.ts ? new Date(a.ts) : null;
+    var timeStr = d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—';
+    var cls = a.result === 'Qualified' ? 'ok' : 'skip';
+    var orderLinkHtml = a.order ? (a.orderId
+      ? '<a href="https://admin.shopify.com/store/showroomla/orders/' + a.orderId + '" target="_blank" style="color:var(--blue-mid);font-weight:700;text-decoration:none;">Order #' + a.order + ' \u2192</a>'
+      : '<a href="https://admin.shopify.com/store/showroomla/orders?query=' + a.order + '" target="_blank" style="color:var(--blue-mid);font-weight:700;text-decoration:none;">Order #' + a.order + ' \u2192</a>') : '';
+    return '<div class="mon-attempt-item result-' + cls + '">' +
+      '<div class="mon-attempt-row">' +
+        '<span class="mon-attempt-result-label ' + cls + '">' + (a.result || '—') + '</span>' +
+        '<span class="mon-attempt-ts">' + timeStr + '</span>' +
+      '</div>' +
+      (a.reason ? '<div class="mon-attempt-reason-text">' + a.reason + '</div>' : '') +
+      (orderLinkHtml ? '<div class="mon-attempt-reason-text">' + orderLinkHtml + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+// ── Toast ──────────────────────────────────────────────
+var _tt;
+function toast(msg) {
+  var el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(function() { el.classList.remove('show'); }, 5000);
+}
+</script>
+</body>
+</html>

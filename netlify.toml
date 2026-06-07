@@ -9,4 +9,4 @@
     X-Content-Type-Options = "nosniff"
 
 [functions]
-  timeout = 26
+  node_bundler = "zisi"

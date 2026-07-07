@@ -77,17 +77,32 @@ exports.handler = async function (event, context) {
     const apiKey = process.env.CONSIGNR_API_KEY;
     if (!apiKey) throw new Error('Missing CONSIGNR_API_KEY in env');
 
-    // TEMP DEBUG PROBE — remove after inspecting Consignr raw schema (?debug=raw)
-    if (((event.queryStringParameters || {}).debug) === 'raw') {
-      const dbgUrl = `${CONSIGNR_BASE_URL}/products?instoreOnly=true&page=1`;
-      const dbgRes = await fetchWithTimeout(dbgUrl, { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } }, 10000);
-      const dbgData = await dbgRes.json();
-      const dbgArr = Array.isArray(dbgData) ? dbgData : (dbgData.products || dbgData.data || dbgData.items || []);
-      const dbgFirst = dbgArr[0] || {};
+    // TEMP DEBUG PROBE — remove after inspecting Consignr raw schema (?debug=stores)
+    if (((event.queryStringParameters || {}).debug) === 'stores') {
+      const storeCounts = {}; let withTags = 0; let withCustom = 0; let total = 0;
+      let dbgPage = 1, dbgSize = 0;
+      while (dbgPage <= MAX_PAGES) {
+        const dbgUrl = `${CONSIGNR_BASE_URL}/products?instoreOnly=true&page=${dbgPage}`;
+        const dbgRes = await fetchWithTimeout(dbgUrl, { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } }, 10000);
+        if (dbgRes.status === 429) { await new Promise(r => setTimeout(r, 2000)); continue; }
+        if (!dbgRes.ok) break;
+        const dbgData = await dbgRes.json();
+        const arr = Array.isArray(dbgData) ? dbgData : (dbgData.products || dbgData.data || dbgData.items || []);
+        if (dbgPage === 1) dbgSize = arr.length;
+        for (const p of arr) {
+          total++;
+          const sid = p.storeId || 'NONE';
+          storeCounts[sid] = (storeCounts[sid] || 0) + 1;
+          if (Array.isArray(p.tags) && p.tags.length) withTags++;
+          if (Array.isArray(p.customFields) && p.customFields.length) withCustom++;
+        }
+        if (arr.length === 0 || (dbgPage > 1 && arr.length < dbgSize)) break;
+        dbgPage++; await new Promise(r => setTimeout(r, 150));
+      }
       return {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ ok: true, debug: true, first_product_keys: Object.keys(dbgFirst), first_product: dbgFirst }, null, 2)
+        body: JSON.stringify({ ok: true, debug: true, total_items: total, distinct_stores: Object.keys(storeCounts).length, store_counts: storeCounts, items_with_tags: withTags, items_with_customFields: withCustom }, null, 2)
       };
     }
 

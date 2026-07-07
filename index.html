@@ -224,6 +224,7 @@ body {
     <h1>Lead Rotation</h1>
     <div class="header-right">
       <div class="sync-dot" id="sync-dot"></div>
+      <a href="https://srlacommission.netlify.app" class="photos-link" id="commission-link" style="display:none;">Commission</a>
       <a href="/photos" class="photos-link">Photos</a>
       <button class="settings-btn" onclick="openDrawer()">&#9881; Settings</button>
     </div>
@@ -399,6 +400,88 @@ body {
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- Admin PIN Modal (Commission unlock) -->
+<style>
+#app h1 { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.pin-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 300; }
+.pin-overlay.show { display: flex; }
+.pin-box { background: white; border-radius: 16px; padding: 22px 20px; width: 260px; max-width: 84vw; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; }
+.pin-title { font-size: 1rem; font-weight: 700; color: var(--dark, #1A1A1A); margin-bottom: 14px; }
+.pin-input { width: 100%; box-sizing: border-box; padding: 12px; font-size: 1.4rem; text-align: center; letter-spacing: 0.4em; border: 2px solid var(--gray-border, #E0E0E0); border-radius: 11px; outline: none; }
+.pin-input:focus { border-color: var(--blue, #1B3A5C); }
+.pin-error { color: #dc2626; font-size: 0.82rem; font-weight: 600; margin-top: 8px; height: 16px; visibility: hidden; }
+.pin-error.show { visibility: visible; }
+.pin-actions { display: flex; gap: 10px; margin-top: 16px; }
+.pin-actions button { flex: 1; padding: 11px; border-radius: 11px; font-size: 0.9rem; font-weight: 700; cursor: pointer; border: none; }
+.pin-cancel { background: var(--gray-border, #E0E0E0); color: #555; }
+.pin-ok { background: var(--blue, #1B3A5C); color: white; }
+</style>
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-box">
+    <div class="pin-title">Admin PIN</div>
+    <input class="pin-input" id="pin-input" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="&#8226;&#8226;&#8226;&#8226;">
+    <div class="pin-error" id="pin-error">Incorrect PIN</div>
+    <div class="pin-actions">
+      <button class="pin-cancel" id="pin-cancel">Cancel</button>
+      <button class="pin-ok" id="pin-ok">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Admin Commission unlock — isolated, additive. Session-only, resets on refresh. */
+(function() {
+  try {
+    var ADMIN_PIN = '2847';
+    var titleEl  = document.querySelector('#app h1');
+    var linkEl   = document.getElementById('commission-link');
+    var overlay  = document.getElementById('pin-overlay');
+    var input    = document.getElementById('pin-input');
+    var errEl    = document.getElementById('pin-error');
+    var okBtn    = document.getElementById('pin-ok');
+    var cancelBtn= document.getElementById('pin-cancel');
+    if (!titleEl || !linkEl || !overlay || !input || !okBtn || !cancelBtn) return;
+
+    var pressTimer = null;
+    function startPress() { clearTimeout(pressTimer); pressTimer = setTimeout(openPin, 600); }
+    function cancelPress() { clearTimeout(pressTimer); }
+
+    function openPin() {
+      input.value = '';
+      if (errEl) errEl.classList.remove('show');
+      overlay.classList.add('show');
+      setTimeout(function() { try { input.focus(); } catch(e){} }, 50);
+    }
+    function closePin() { overlay.classList.remove('show'); }
+
+    function verify() {
+      if (input.value === ADMIN_PIN) {
+        linkEl.style.display = 'inline-flex';
+        closePin();
+      } else {
+        if (errEl) errEl.classList.add('show');
+        input.value = '';
+        try { input.focus(); } catch(e){}
+      }
+    }
+
+    titleEl.addEventListener('touchstart', startPress, { passive: true });
+    titleEl.addEventListener('touchend', cancelPress);
+    titleEl.addEventListener('touchmove', cancelPress, { passive: true });
+    titleEl.addEventListener('touchcancel', cancelPress);
+    titleEl.addEventListener('mousedown', startPress);
+    titleEl.addEventListener('mouseup', cancelPress);
+    titleEl.addEventListener('mouseleave', cancelPress);
+    titleEl.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    okBtn.addEventListener('click', verify);
+    cancelBtn.addEventListener('click', closePin);
+    input.addEventListener('keydown', function(e) { if (e.key === 'Enter') verify(); });
+    overlay.addEventListener('click', function(e) { if (e.target === overlay) closePin(); });
+  } catch (err) { /* fail silently — must never break the page */ }
+})();
+</script>
 
 <script>
 // ═══════════════════════════════════════════════════════

@@ -76,6 +76,21 @@ exports.handler = async function (event, context) {
   try {
     const apiKey = process.env.CONSIGNR_API_KEY;
     if (!apiKey) throw new Error('Missing CONSIGNR_API_KEY in env');
+
+    // TEMP DEBUG PROBE — remove after inspecting Consignr raw schema (?debug=raw)
+    if (((event.queryStringParameters || {}).debug) === 'raw') {
+      const dbgUrl = `${CONSIGNR_BASE_URL}/products?instoreOnly=true&page=1`;
+      const dbgRes = await fetchWithTimeout(dbgUrl, { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } }, 10000);
+      const dbgData = await dbgRes.json();
+      const dbgArr = Array.isArray(dbgData) ? dbgData : (dbgData.products || dbgData.data || dbgData.items || []);
+      const dbgFirst = dbgArr[0] || {};
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ ok: true, debug: true, first_product_keys: Object.keys(dbgFirst), first_product: dbgFirst }, null, 2)
+      };
+    }
+
     const result = await fetchAllConsignrProducts(apiKey);
     return {
       statusCode: 200,

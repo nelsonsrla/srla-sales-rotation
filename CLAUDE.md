@@ -41,6 +41,7 @@ This auto-deploys via GitHub → Netlify. No manual deploy command needed.
 - Notification history with search, date filter, annotation (3-dot menu)
 - Monitor card: Last Webhook Attempt, Last Successful Run, Recent Webhook Attempts with filters
 - Photos link in header → /photos
+- Admin-only Commission button in header (hidden by default; long-press the "Lead Rotation" title → PIN modal → PIN 2847 reveals a pill linking to https://srlacommission.netlify.app; session-only, resets on refresh, no persistence)
 - Settings drawer: rep management, push notifications, rotation control
 - Firebase SSE real-time sync
 
@@ -59,7 +60,7 @@ This auto-deploys via GitHub → Netlify. No manual deploy command needed.
 - Never modify Firebase data without explicit confirmation from Nelson
 - Always update CLAUDE.md when new features are added or files change
 
-## Master Ruleset (Rules 1-20)
+## Master Ruleset (Rules 1-22)
 - Rule 1: Never rewrite any file without explicit permission. Always ask first.
 - Rule 2: Audit all work before presenting. No files until audit passes.
 - Rule 3: Always provide the most recent updated file.
@@ -80,6 +81,8 @@ This auto-deploys via GitHub → Netlify. No manual deploy command needed.
 - Rule 18: Guardrails check — review guardrails before starting any task.
 - Rule 19: Netlify Function Timeout — estimate execution time, flag timeout risk, ensure netlify.toml is correct.
 - Rule 20: Error-First Debugging — surface raw error from source system before attempting any fix.
+- Rule 21: Context Handoff — end EVERY response with a concise, copy-pasteable "Context handoff" code block capturing current state (branch, what shipped/in-flight, what's blocked/on the user, key facts) plus the active task/next prompt, so work can move to a new thread by pasting that block.
+- Rule 22: Single Source of Truth / Cross-Device Sync — this project CLAUDE.md (committed to git) is the canonical cross-device memory. Every rule, decision, feature change, and durable piece of context MUST be written here and pushed to GitHub immediately, so a `project device refresh` on ANY device pulls the most up-to-date version. Do NOT rely on the machine-local global CLAUDE.md (~/.claude/CLAUDE.md) or local memory files for anything that must travel across devices — those do NOT sync. If it matters, it goes in this file and gets pushed.
 
 ## Session Prompt
-You are working on the SRLA Sales Rotation app for Nelson Johnson (GM/COO-track at Showroom LA). Read CLAUDE.md in the project root before doing anything. Apply all 20 rules from the Master Ruleset on every response. Never rewrite files without explicit permission. Always audit before presenting. Always confirm no saved data is altered before any Firebase or deploy change. The deploy workflow is: git add . && git commit -m "description" && git push which auto-deploys via GitHub to Netlify. All folder names must be lowercase. Surface raw errors before attempting any fix.
+You are working on the SRLA Sales Rotation app for Nelson Johnson (GM/COO-track at Showroom LA). Read CLAUDE.md in the project root before doing anything. Apply all 22 rules from the Master Ruleset on every response. Never rewrite files without explicit permission. Always audit before presenting. Always confirm no saved data is altered before any Firebase or deploy change. The deploy workflow is: git add . && git commit -m "description" && git push which auto-deploys via GitHub to Netlify. All folder names must be lowercase. Surface raw errors before attempting any fix.

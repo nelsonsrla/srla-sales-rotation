@@ -2396,7 +2396,11 @@
     }
     function buildFilterSheet() {
       const brandCounts = {}; const sizesSet = new Set();
-      state.products.forEach(p => {
+      // Derive brand/size options from the active set: the location's products when
+      // a location is selected, otherwise the full catalog. This keeps size/brand
+      // filters composable with the Location View (e.g. XL within Summer League).
+      const filterSource = state.locationMode ? state.locationProducts : state.products;
+      filterSource.forEach(p => {
         const v = (p.vendor || '').trim();
         if (v) brandCounts[v] = (brandCounts[v] || 0) + 1;
         if (Array.isArray(p.sizes)) p.sizes.forEach(s => { if (s) sizesSet.add(String(s)); });

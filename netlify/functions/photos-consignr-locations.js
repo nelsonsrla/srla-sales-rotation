@@ -10,7 +10,7 @@
 
 const CONSIGNR_BASE_URL = 'https://api.consignr.app/v1/api';
 const PAGE_LIMIT = 100;   // Consignr max items per page
-const MAX_PAGES = 60;     // safety cap (6000 items) to stay under Netlify's 26s timeout
+const MAX_PAGES = 150;    // safety cap (15000 items) to stay under Netlify's 26s timeout
 
 function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
   const controller = new AbortController();
@@ -64,7 +64,7 @@ async function buildLocationMap(apiKey) {
     if (arr.length < PAGE_LIMIT) break; // short page => last page
     page++;
     if (page > MAX_PAGES) { capped = true; break; }
-    await sleep(120); // gentle pacing to avoid 429s
+    // No inter-page delay: 429s are handled by the back-off above. Pacing added ~7s/scan.
   }
 
   // Serialize Sets -> arrays

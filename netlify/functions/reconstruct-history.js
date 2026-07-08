@@ -42,6 +42,35 @@ exports.handler = async function (event) {
     const token = await getShopifyToken();
     if (!token) throw new Error('No Shopify token in Firebase config');
 
+    if (mode === 'dedupe') {
+      // Remove reconstructed entries whose order # also has a REAL notification (keep the real one).
+      const commit = params.commit === '1';
+      const histRes = await fetchWithTimeout(DB + '/rotation/history.json', {}, 12000);
+      const hist = (await histRes.json()) || {};
+      const realOrders = new Set();
+      for (const k in hist) { const e = hist[k]; if (e && e.trigger !== 'reconstructed' && e.orderNum) realOrders.add(String(e.orderNum).replace('#', '')); }
+      const toDelete = [];
+      for (const k in hist) {
+        const e = hist[k];
+        if (e && e.trigger === 'reconstructed' && e.orderNum && realOrders.has(String(e.orderNum).replace('#', ''))) {
+          toDelete.push({ key: k, orderNum: e.orderNum, reconstructedRep: e.rep });
+        }
+      }
+      let deleted = 0;
+      if (commit) {
+        for (const d of toDelete) {
+          try { await fetchWithTimeout(DB + '/rotation/history/' + d.key + '.json', { method: 'DELETE' }, 8000); deleted++; } catch (e) {}
+        }
+      }
+      return { statusCode: 200, headers: cors, body: JSON.stringify({
+        ok: true, mode: 'dedupe', commit: commit,
+        orders_with_real_entry: realOrders.size,
+        reconstructed_duplicates_found: toDelete.length,
+        deleted: deleted,
+        sample: toDelete.slice(0, 20)
+      }, null, 2) };
+    }
+
     if (mode === 'run') {
       // Rebuild rotation/history from Shopify for every order in notified_orders.
       // Reps are backtracked from the round-robin (reps[store%n], +1 each notify), anchored to the
@@ -64,13 +93,20 @@ exports.handler = async function (event) {
       const anchorRep = 1;          // Lillie
       function repFor(i) { return REPS[(((anchorRep + (i - anchorIdx)) % n) + n) % n]; }
 
+      // Skip orders that already have a REAL (live) notification entry — never duplicate them.
+      const histRes = await fetchWithTimeout(DB + '/rotation/history.json', {}, 12000);
+      const hist = (await histRes.json()) || {};
+      const realOrders = new Set();
+      for (const hk in hist) { const he = hist[hk]; if (he && he.trigger !== 'reconstructed' && he.orderNum) realOrders.add(String(he.orderNum).replace('#', '')); }
+
       const batch = nums.slice(start, start + count);
       const entries = [];
-      let written = 0, notFound = 0, errors = 0;
+      let written = 0, notFound = 0, errors = 0, skipped = 0;
       for (let j = 0; j < batch.length; j++) {
         const i = start + j;
         const num = batch[j];
         const rep = repFor(i);
+        if (realOrders.has(String(num))) { skipped++; continue; } // real notification exists — don't reconstruct
         try {
           const o = await fetchOrderByNumber(token, num);
           if (!o) { notFound++; entries.push({ order: num, rep: rep, found: false }); continue; }
@@ -80,7 +116,9 @@ exports.handler = async function (event) {
           const titles = (o.line_items || []).map(function (li) { return li.title; }).filter(Boolean);
           const items = titles.slice(0, 2).join(', ') + (titles.length > 2 ? ' +' + (titles.length - 2) + ' more' : '');
           const customer = o.customer ? ((o.customer.first_name || '') + ' ' + (o.customer.last_name || '')).trim() : 'Unknown';
-          const entry = { type: 'shopify', rep: rep, customer: customer, amount: amount, items: items, orderNum: '#' + num, orderId: String(o.id), trigger: 'reconstructed', ts: ts };
+          const email = (o.customer && o.customer.email) || o.email || '';
+          const phone = (o.customer && o.customer.phone) || o.phone || (o.shipping_address && o.shipping_address.phone) || '';
+          const entry = { type: 'shopify', rep: rep, customer: customer, email: email, phone: phone, amount: amount, items: items, orderNum: '#' + num, orderId: String(o.id), trigger: 'reconstructed', ts: ts };
           entries.push(entry);
           if (commit) {
             // Key by created_at ms => deterministic & idempotent (re-runs overwrite, never duplicate).
@@ -92,7 +130,7 @@ exports.handler = async function (event) {
       return { statusCode: 200, headers: cors, body: JSON.stringify({
         ok: true, mode: 'run', commit: commit, total_orders: N, start: start, processed: batch.length,
         next_start: (start + count) < N ? (start + count) : null,
-        written: written, not_found: notFound, errors: errors, entries: entries
+        written: written, skipped_real: skipped, not_found: notFound, errors: errors, entries: entries
       }, null, 2) };
     }
 

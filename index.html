@@ -652,7 +652,7 @@ function applyHistoryFilter() {
     if (fromTs && h.ts < fromTs) return false;
     if (toTs   && h.ts > toTs)   return false;
     if (searchTerm) {
-      var hay = [h.rep||"",h.orderNum||"",h.customer||"",h.amount||"",h.items||"",h.trigger||"",h.annotation?h.annotation.text.replace(/<[^>]+>/g,""):""].join(" ").toLowerCase();
+      var hay = [h.rep||"",h.orderNum||"",h.customer||"",h.email||"",h.phone||"",h.amount||"",h.items||"",h.trigger||"",h.annotation?h.annotation.text.replace(/<[^>]+>/g,""):""].join(" ").toLowerCase();
       if (hay.indexOf(searchTerm) === -1) return false;
     }
     return true;

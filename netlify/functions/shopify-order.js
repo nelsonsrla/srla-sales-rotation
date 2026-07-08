@@ -453,7 +453,7 @@ exports.handler = async function(event) {
 
   // Write history independently
   try {
-    var historyEntry = { type: 'shopify', rep: repName, customer: customerName, amount: '$' + formattedVal, items: top3Items.slice(0, 2).join(', ') + overflow, orderNum: '#' + orderNum, orderId: orderId, trigger: triggerLabel, ts: Date.now() };
+    var historyEntry = { type: 'shopify', rep: repName, customer: customerName, email: email || '', phone: phone || '', amount: '$' + formattedVal, items: top3Items.slice(0, 2).join(', ') + overflow, orderNum: '#' + orderNum, orderId: orderId, trigger: triggerLabel, ts: Date.now() };
     await fetch(DB + '/rotation/history/' + Date.now() + '.json', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(historyEntry) });
     console.log('History written for order=' + orderNum);
   } catch (err) { console.error('History write failed:', err.message); }

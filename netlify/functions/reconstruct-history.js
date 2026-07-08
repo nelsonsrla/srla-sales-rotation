@@ -42,6 +42,57 @@ exports.handler = async function (event) {
     const token = await getShopifyToken();
     if (!token) throw new Error('No Shopify token in Firebase config');
 
+    if (mode === 'run') {
+      // Rebuild rotation/history from Shopify for every order in notified_orders.
+      // Reps are backtracked from the round-robin (reps[store%n], +1 each notify), anchored to the
+      // KNOWN pair #16144 -> Lillie (from last_run) rather than the live-moving store position.
+      // commit=1 writes to Firebase (history only — NEVER notifies). Batched via start/count.
+      const commit = params.commit === '1';
+      const start = parseInt(params.start || '0', 10) || 0;
+      const count = Math.min(parseInt(params.count || '40', 10) || 40, 60);
+      const REPS = ['Leanna', 'Lillie', 'Yoni'];
+      const n = REPS.length;
+
+      const noRes = await fetchWithTimeout(DB + '/rotation/notified_orders.json?shallow=true', {}, 10000);
+      const noObj = (await noRes.json()) || {};
+      const nums = Object.keys(noObj).filter(function (k) { return /^\d+$/.test(k); }).map(Number).sort(function (a, b) { return a - b; });
+      const N = nums.length;
+      const anchorIdx = N - 1;      // last (highest #) = #16144
+      const anchorRep = 1;          // = Lillie (reps[1]), known from last_run
+      function repFor(i) { return REPS[(((anchorRep + (i - anchorIdx)) % n) + n) % n]; }
+
+      const batch = nums.slice(start, start + count);
+      const entries = [];
+      let written = 0, notFound = 0, errors = 0;
+      for (let j = 0; j < batch.length; j++) {
+        const i = start + j;
+        const num = batch[j];
+        const rep = repFor(i);
+        try {
+          const o = await fetchOrderByNumber(token, num);
+          if (!o) { notFound++; entries.push({ order: num, rep: rep, found: false }); continue; }
+          const ts = new Date(o.created_at).getTime();
+          const amtNum = parseFloat(o.total_price) || 0;
+          const amount = '$' + amtNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const titles = (o.line_items || []).map(function (li) { return li.title; }).filter(Boolean);
+          const items = titles.slice(0, 2).join(', ') + (titles.length > 2 ? ' +' + (titles.length - 2) + ' more' : '');
+          const customer = o.customer ? ((o.customer.first_name || '') + ' ' + (o.customer.last_name || '')).trim() : 'Unknown';
+          const entry = { type: 'shopify', rep: rep, customer: customer, amount: amount, items: items, orderNum: '#' + num, orderId: String(o.id), trigger: 'reconstructed', ts: ts };
+          entries.push(entry);
+          if (commit) {
+            // Key by created_at ms => deterministic & idempotent (re-runs overwrite, never duplicate).
+            await fetchWithTimeout(DB + '/rotation/history/' + ts + '.json', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) }, 10000);
+            written++;
+          }
+        } catch (e) { errors++; entries.push({ order: num, rep: rep, error: e.message }); }
+      }
+      return { statusCode: 200, headers: cors, body: JSON.stringify({
+        ok: true, mode: 'run', commit: commit, total_orders: N, start: start, processed: batch.length,
+        next_start: (start + count) < N ? (start + count) : null,
+        written: written, not_found: notFound, errors: errors, entries: entries
+      }, null, 2) };
+    }
+
     if (mode === 'envcheck') {
       // Non-secret: confirm which app the Netlify OAuth env vars point at. Never echoes the secret value.
       const cid = process.env.SHOPIFY_CLIENT_ID || null;

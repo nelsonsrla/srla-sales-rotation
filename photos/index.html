@@ -914,6 +914,13 @@
         <span class="pill-text">Filter</span>
         <span class="pill-badge" id="filter-badge" style="display:none">0</span>
       </button>
+      <button class="pill" aria-label="Locations" id="locations-btn" onclick="openLocationsPicker()">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 21s-7-6.5-7-11a7 7 0 0 1 14 0c0 4.5-7 11-7 11z"/>
+          <circle cx="12" cy="10" r="2.5"/>
+        </svg>
+        <span class="pill-text">Locations</span>
+      </button>
       <div class="col-toggle" role="group" aria-label="Columns">
         <button data-cols="1" aria-label="1 column"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="1"/></svg></button>
         <button data-cols="2" class="active" aria-label="2 columns"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="12" rx="1"/><rect x="9" y="2" width="5" height="12" rx="1"/></svg></button>
@@ -958,6 +965,7 @@
       <div class="skeleton-card"><div class="skeleton-image"></div><div class="skeleton-line short"></div><div class="skeleton-line long"></div></div>
       <div class="skeleton-card"><div class="skeleton-image"></div><div class="skeleton-line short"></div><div class="skeleton-line long"></div></div>
     </div>
+    <div id="location-banner" style="display:none"></div>
     <div class="grid" data-cols="2" id="grid"></div>
     <div id="empty-filter-container" style="display:none"></div>
     <div id="error-container" style="display:none"></div>
@@ -1002,6 +1010,27 @@
 
   <!-- Filter sheet -->
   <div class="sheet-overlay" id="sheet-overlay"></div>
+
+  <style>
+    .location-list { display: flex; flex-direction: column; padding: 8px 0; }
+    .location-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 16px 24px; background: transparent; border: none; border-bottom: 1px solid var(--border); font-family: inherit; font-size: 15px; color: var(--text-primary); text-align: left; cursor: pointer; min-height: 52px; }
+    .location-row:hover { background: var(--bg-pill-hover); }
+    .location-row.active { font-weight: 600; }
+    .location-row-name { flex: 1; }
+    .location-row-check { color: var(--accent); font-weight: 700; }
+  </style>
+  <div class="sheet-overlay" id="location-sheet-overlay" onclick="closeLocationsSheet()"></div>
+  <aside class="sheet" id="location-sheet" role="dialog" aria-label="Locations">
+    <div class="sheet-handle"></div>
+    <div class="sheet-header">
+      <span style="width:64px"></span>
+      <h2 class="sheet-title">Location</h2>
+      <button class="sheet-close" id="location-sheet-close" aria-label="Close" onclick="closeLocationsSheet()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body" id="location-sheet-body"></div>
+  </aside>
   <aside class="sheet" id="sheet" role="dialog" aria-label="Filters">
     <div class="sheet-handle"></div>
     <div class="sheet-header">
@@ -1036,6 +1065,7 @@
     const CONFIG = {
       SHOPIFY_ENDPOINT: '/.netlify/functions/photos-shopify-fetch',
       CONSIGNR_ENDPOINT: '/.netlify/functions/photos-consignr-fetch',
+      LOCATIONS_ENDPOINT: '/.netlify/functions/photos-consignr-locations',
       IMAGE_PROXY: '/.netlify/functions/photos-image-proxy',
       MAX_PAGES: 50,
       CACHE_KEY: 'srla_photos_cache_v1',
@@ -1058,6 +1088,9 @@
       products: [],
       productIds: new Set(),
       productMap: new Map(),  // id -> product
+      locationMode: null,      // {id, name} when viewing a Consignr physical location
+      locationProducts: [],    // catalog-shaped products for the active location
+      locationsList: null,     // cached [{id, name}] for the picker
       selected: new Set(),
       loading: true,
       loadController: null,
@@ -1129,6 +1162,121 @@
     }
 
     // ============================================
+    // LOCATION VIEW (Consignr physical locations)
+    // ============================================
+    function fetchLocationJSON(url, timeoutMs) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs || 28000);
+      return fetch(url, { signal: ctrl.signal })
+        .then(r => { clearTimeout(t); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .catch(e => { clearTimeout(t); throw e; });
+    }
+    function openLocationsPicker() {
+      document.getElementById('location-sheet').classList.add('open');
+      document.getElementById('location-sheet-overlay').classList.add('open');
+      document.body.classList.add('sheet-open');
+      renderLocationSheet();
+      if (!state.locationsList) loadLocationsList();
+    }
+    function closeLocationsSheet() {
+      document.getElementById('location-sheet').classList.remove('open');
+      document.getElementById('location-sheet-overlay').classList.remove('open');
+      document.body.classList.remove('sheet-open');
+    }
+    function loadLocationsList() {
+      const body = document.getElementById('location-sheet-body');
+      body.innerHTML = '<div style="padding:28px 24px;color:var(--text-secondary);font-size:13px;">Loading locations…</div>';
+      fetchLocationJSON(CONFIG.LOCATIONS_ENDPOINT + '?action=locations', 15000)
+        .then(d => { state.locationsList = (d && d.locations) || []; renderLocationSheet(); })
+        .catch(() => { body.innerHTML = '<div style="padding:28px 24px;color:var(--text-secondary);font-size:13px;">Could not load locations. Close and tap Locations to retry.</div>'; });
+    }
+    function renderLocationSheet() {
+      const body = document.getElementById('location-sheet-body');
+      if (!state.locationsList) return; // loading state already shown
+      const active = state.locationMode ? state.locationMode.id : null;
+      let html = '<div class="location-list">';
+      if (state.locationMode) {
+        html += '<button class="location-row" data-loc-exit="1" type="button"><span class="location-row-name">&#8592; Back to full catalog</span></button>';
+      }
+      state.locationsList.forEach(function(L) {
+        const nm = escapeHtml((L.name || '').trim());
+        html += '<button class="location-row' + (L.id === active ? ' active' : '') + '" data-loc-id="' + escapeHtml(L.id) + '" data-loc-name="' + nm + '" type="button">' +
+                  '<span class="location-row-name">' + nm + '</span>' +
+                  (L.id === active ? '<span class="location-row-check">&#10003;</span>' : '') +
+                '</button>';
+      });
+      html += '</div>';
+      body.innerHTML = html;
+      body.querySelectorAll('[data-loc-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() { enterLocation(btn.dataset.locId, btn.dataset.locName); });
+      });
+      const exitBtn = body.querySelector('[data-loc-exit]');
+      if (exitBtn) exitBtn.addEventListener('click', exitLocation);
+    }
+    function enterLocation(id, name) {
+      closeLocationsSheet();
+      // Reset browse state so the whole location shows.
+      state.searchQuery = '';
+      const gs = document.getElementById('global-search'); if (gs) gs.value = '';
+      state.activeCategory = 'all';
+      document.querySelectorAll('.cat-pill').forEach(b => b.classList.toggle('active', b.dataset.cat === 'all'));
+      state.filters = { brands: new Set(), sizes: new Set(), priceMin: null, priceMax: null, source: 'both', onSale: false };
+      updateFilterBadge();
+      state.selected.clear();
+      state.locationMode = { id: id, name: (name || '').trim() };
+      state.locationProducts = [];
+      renderLocationBanner(true);
+      showLocationLoading();
+      fetchLocationJSON(CONFIG.LOCATIONS_ENDPOINT + '?action=products&locationId=' + encodeURIComponent(id), 28000)
+        .then(d => {
+          if (!state.locationMode || state.locationMode.id !== id) return; // user changed/exited meanwhile
+          const prods = (d && d.products) || [];
+          state.locationProducts = prods;
+          prods.forEach(p => state.productMap.set(p.id, p));
+          const sk = document.getElementById('skeleton'); if (sk) sk.style.display = 'none';
+          renderLocationBanner(false, prods.length);
+          renderGrid();
+          updateSelectionUI();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        })
+        .catch(() => {
+          if (!state.locationMode || state.locationMode.id !== id) return;
+          renderLocationBanner(false, 0, true);
+          showToast('Could not load this location. Try again.');
+        });
+    }
+    function exitLocation() {
+      closeLocationsSheet();
+      state.locationMode = null;
+      state.locationProducts = [];
+      state.selected.clear();
+      document.getElementById('location-banner').style.display = 'none';
+      renderGrid();
+      updateSelectionUI();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function showLocationLoading() {
+      const grid = document.getElementById('grid'); if (grid) grid.innerHTML = '';
+      const fe = document.getElementById('empty-filter-container');
+      if (fe) { fe.style.display = 'block'; fe.innerHTML = '<div class="state"><p class="state-message"><span class="loading-dot"></span> Loading location photos…</p></div>'; }
+    }
+    function renderLocationBanner(loading, count, errored) {
+      const el = document.getElementById('location-banner');
+      if (!el || !state.locationMode) return;
+      const nm = escapeHtml(state.locationMode.name);
+      let right;
+      if (loading) right = 'Loading&#8230;';
+      else if (errored) right = 'Error';
+      else right = (count || 0).toLocaleString() + ' piece' + (count === 1 ? '' : 's');
+      el.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 20px;padding:12px 16px;background:var(--accent);color:#fff;border-radius:10px;font-size:13px;';
+      el.innerHTML =
+        '<span style="font-weight:500;letter-spacing:0.02em;">&#128205; ' + nm + ' &middot; <span style="opacity:0.85;">' + right + '</span></span>' +
+        '<button type="button" id="location-exit-btn" style="background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">&#10005; Exit</button>';
+      const ex = document.getElementById('location-exit-btn');
+      if (ex) ex.addEventListener('click', exitLocation);
+    }
+
+    // ============================================
     // CACHE
     // ============================================
     function readCache() {
@@ -1186,7 +1334,8 @@
     function getFilteredProducts() {
       const cat = state.activeCategory;
       const f = state.filters;
-      let result = state.products.filter(p => {
+      const base = state.locationMode ? state.locationProducts : state.products;
+      let result = base.filter(p => {
         if (cat !== 'all') {
           const cats = getProductCategories(p);
           if (!cats.has(cat)) return false;
@@ -1534,6 +1683,16 @@
       state.currentFiltered = filtered;
       removeScrollSentinel();
 
+      if (filtered.length === 0 && state.locationMode) {
+        filterEmpty.style.display = 'block';
+        filterEmpty.innerHTML =
+          '<div class="state">' +
+            '<h2 class="state-title">No photos at this location</h2>' +
+            '<p class="state-message">Nothing with images is currently at ' + escapeHtml(state.locationMode.name) + '.</p>' +
+          '</div>';
+        updateLoadStatus();
+        return;
+      }
       if (filtered.length === 0 && state.products.length > 0) {
         filterEmpty.style.display = 'block';
         filterEmpty.innerHTML =

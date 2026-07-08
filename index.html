@@ -429,6 +429,19 @@ body {
   </div>
 </div>
 
+<!-- Reusable admin-PIN prompt (separate from the Commission unlock; used to gate history Clear) -->
+<div class="pin-overlay" id="adminpin-overlay">
+  <div class="pin-box">
+    <div class="pin-title" id="adminpin-title">Admin PIN</div>
+    <input class="pin-input" id="adminpin-input" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="&#8226;&#8226;&#8226;&#8226;" onkeydown="if(event.key==='Enter'){_adminPinVerify();}">
+    <div class="pin-error" id="adminpin-error">Incorrect PIN</div>
+    <div class="pin-actions">
+      <button class="pin-cancel" id="adminpin-cancel" onclick="_adminPinCancel()">Cancel</button>
+      <button class="pin-ok" id="adminpin-ok" onclick="_adminPinVerify()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* Admin Commission unlock — isolated, additive. Session-only, resets on refresh. */
 (function() {
@@ -768,11 +781,66 @@ function addHistoryEntry(entry) {
   }).catch(function() {});
 }
 
+// Reusable admin-PIN prompt (separate modal from the Commission unlock).
+var _adminPinCb = null;
+function requestAdminPin(promptTitle, onSuccess) {
+  var ov = document.getElementById('adminpin-overlay');
+  var inp = document.getElementById('adminpin-input');
+  var err = document.getElementById('adminpin-error');
+  var titleEl = document.getElementById('adminpin-title');
+  if (!ov || !inp) return;
+  if (titleEl) titleEl.textContent = promptTitle || 'Admin PIN';
+  inp.value = '';
+  if (err) err.classList.remove('show');
+  _adminPinCb = onSuccess;
+  ov.classList.add('show');
+  setTimeout(function () { try { inp.focus(); } catch (e) {} }, 50);
+}
+function _adminPinVerify() {
+  var inp = document.getElementById('adminpin-input');
+  var err = document.getElementById('adminpin-error');
+  var ov = document.getElementById('adminpin-overlay');
+  if (inp && inp.value === '2847') {
+    ov.classList.remove('show');
+    var cb = _adminPinCb; _adminPinCb = null;
+    if (typeof cb === 'function') cb();
+  } else {
+    if (err) err.classList.add('show');
+    if (inp) { inp.value = ''; try { inp.focus(); } catch (e) {} }
+  }
+}
+function _adminPinCancel() {
+  var ov = document.getElementById('adminpin-overlay');
+  if (ov) ov.classList.remove('show');
+  _adminPinCb = null;
+}
+
+// Hardened, admin-only Clear: confirm -> PIN -> final confirm -> BACKUP -> log -> delete.
+// Backs up to rotation/history_backup and records who/when so a wipe is always recoverable.
 function clearHistory() {
-  if (!confirm('Clear all notification history?')) return;
-  fetch(DB_URL + '/rotation/history.json', { method: 'DELETE' })
-    .then(function() { renderHistory(null); toast('History cleared'); })
-    .catch(function() { toast('Could not clear history'); });
+  if (!confirm('Clear ALL notification history?\n\nThis is admin-only and permanent. A backup will be saved first.')) return;
+  requestAdminPin('Admin PIN to clear history', function () {
+    if (!confirm('FINAL STEP — permanently clear the notification history now?\n\nA backup is saved to history_backup before deleting.')) return;
+    (async function () {
+      try {
+        var res = await fetch(DB_URL + '/rotation/history.json');
+        var current = await res.json();
+        var ts = Date.now();
+        if (current) {
+          await fetch(DB_URL + '/rotation/history_backup/' + ts + '.json', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(current)
+          });
+        }
+        await fetch(DB_URL + '/rotation/history_clear_log/' + ts + '.json', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ by: (typeof myRepName !== 'undefined' && myRepName) ? myRepName : 'unknown', ts: ts, entriesBackedUp: current ? Object.keys(current).length : 0 })
+        });
+        await fetch(DB_URL + '/rotation/history.json', { method: 'DELETE' });
+        renderHistory(null);
+        toast('History cleared — backup saved (' + (current ? Object.keys(current).length : 0) + ' entries)');
+      } catch (e) { toast('Clear failed: ' + e.message); }
+    })();
+  });
 }
 
 // ── Lead Modal ─────────────────────────────────────────

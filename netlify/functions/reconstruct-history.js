@@ -42,6 +42,18 @@ exports.handler = async function (event) {
     const token = await getShopifyToken();
     if (!token) throw new Error('No Shopify token in Firebase config');
 
+    if (mode === 'envcheck') {
+      // Non-secret: confirm which app the Netlify OAuth env vars point at. Never echoes the secret value.
+      const cid = process.env.SHOPIFY_CLIENT_ID || null;
+      return { statusCode: 200, headers: cors, body: JSON.stringify({
+        ok: true, mode: 'envcheck',
+        SHOPIFY_CLIENT_ID: cid,
+        matches_SRLA_Rotation: cid === 'a5c1040c8274a0fd62ed06c10af3ce96',
+        SHOPIFY_CLIENT_SECRET_present: !!process.env.SHOPIFY_CLIENT_SECRET,
+        SHOPIFY_PHOTO_CLIENT_ID: process.env.SHOPIFY_PHOTO_CLIENT_ID || null
+      }, null, 2) };
+    }
+
     if (mode === 'whoami') {
       // Identify which Shopify app this token belongs to + its scopes.
       const gql = { query: '{ currentAppInstallation { app { title } accessScopes { handle } } }' };

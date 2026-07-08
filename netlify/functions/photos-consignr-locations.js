@@ -35,16 +35,22 @@ async function fetchLocations(apiKey) {
   }));
 }
 
+// A value that looks like an apparel/footwear size (not a color or misc option).
+const SIZE_RE = /^(\d+(\.\d+)?|\d+\s+\d+\/\d+|XXS|XS|S|M|L|XL|XXL|XXXL|XXXXL|O\/?S)$/i;
 // Pull a size-like value out of an item's option arrays, defensively.
 function extractSize(item) {
   const names = Array.isArray(item.optionNames) ? item.optionNames : [];
   const values = Array.isArray(item.optionValues) ? item.optionValues : [];
   if (!values.length) return null;
+  // Prefer an explicitly size-named option.
   for (let i = 0; i < names.length; i++) {
-    if (/size/i.test(String(names[i] || ''))) return values[i] != null ? String(values[i]) : null;
+    if (/size/i.test(String(names[i] || '')) && values[i] != null) return String(values[i]);
   }
-  // No explicitly-named size option: fall back to the first option value.
-  return values[0] != null ? String(values[0]) : null;
+  // Otherwise accept the first value that is shaped like a size (skip colors, etc.).
+  for (const v of values) {
+    if (v != null && SIZE_RE.test(String(v).trim())) return String(v);
+  }
+  return null;
 }
 
 function normalizeImages(images) {

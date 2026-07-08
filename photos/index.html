@@ -1553,7 +1553,7 @@
 
       const isNew = isNewArrival(p);
       const isSale = !!p.on_sale;
-      const isInStore = p.source === 'consignr';
+      const isInStore = p.instore_only === true;
       const badges = [];
       if (isNew) badges.push('<span class="badge new">Just Dropped</span>');
       if (isSale) badges.push('<span class="badge sale">Sale</span>');

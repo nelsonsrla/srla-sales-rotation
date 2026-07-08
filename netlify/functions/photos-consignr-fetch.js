@@ -76,6 +76,33 @@ exports.handler = async function (event, context) {
   try {
     const apiKey = process.env.CONSIGNR_API_KEY;
     if (!apiKey) throw new Error('Missing CONSIGNR_API_KEY in env');
+
+    // TEMP DEBUG PROBE — inspect /items shape (images? location?) + /locations. Reverted after. (?debug=items)
+    if (((event.queryStringParameters || {}).debug) === 'items') {
+      const hdrs = { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } };
+      const itemsRes = await fetchWithTimeout(`${CONSIGNR_BASE_URL}/items?status=ACTIVE&limit=3&page=1`, hdrs, 10000);
+      const itemsData = await itemsRes.json();
+      const itemsArr = Array.isArray(itemsData) ? itemsData : (itemsData.items || itemsData.data || itemsData.products || []);
+      const firstItem = itemsArr[0] || {};
+      const locRes = await fetchWithTimeout(`${CONSIGNR_BASE_URL}/locations`, hdrs, 10000);
+      const locData = await locRes.json();
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({
+          ok: true, debug: true,
+          items_status: itemsRes.status,
+          item_first_keys: Object.keys(firstItem),
+          item_has_images: Array.isArray(firstItem.images) ? firstItem.images.length : (firstItem.images ? 'non-array' : 'MISSING'),
+          item_location: firstItem.location || null,
+          item_id_sample: firstItem.id || null,
+          item_first: firstItem,
+          locations_status: locRes.status,
+          locations: locData
+        }, null, 2)
+      };
+    }
+
     const result = await fetchAllConsignrProducts(apiKey);
     return {
       statusCode: 200,

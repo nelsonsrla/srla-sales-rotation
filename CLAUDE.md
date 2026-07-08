@@ -60,6 +60,9 @@ This auto-deploys via GitHub → Netlify. No manual deploy command needed.
 - Never modify Firebase data without explicit confirmation from Nelson
 - Always update CLAUDE.md when new features are added or files change
 
+## Automation Hooks
+- `.claude/settings.json` + `.claude/hooks/check-git-sync.sh` — SessionStart hook (committed, syncs across devices). At the start of every session it runs `git fetch` (read-only, never pulls) and warns if the local branch is behind/diverged from origin, so we always edit against the latest pushed files (Rule 22). Review or disable via `/hooks`. Personal settings live in gitignored `.claude/settings.local.json`.
+
 ## Master Ruleset (Rules 1-22)
 - Rule 1: Never rewrite any file without explicit permission. Always ask first.
 - Rule 2: Audit all work before presenting. No files until audit passes.

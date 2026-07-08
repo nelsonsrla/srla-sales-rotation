@@ -57,8 +57,11 @@ exports.handler = async function (event) {
       const noObj = (await noRes.json()) || {};
       const nums = Object.keys(noObj).filter(function (k) { return /^\d+$/.test(k); }).map(Number).sort(function (a, b) { return a - b; });
       const N = nums.length;
-      const anchorIdx = N - 1;      // last (highest #) = #16144
-      const anchorRep = 1;          // = Lillie (reps[1]), known from last_run
+      // Anchor the round-robin on the KNOWN pair #16144 -> Lillie (reps[1]), at its ACTUAL index
+      // (notified_orders keeps growing live, so #16144 is not necessarily the last element).
+      const anchorNum = 16144;
+      const anchorIdx = nums.indexOf(anchorNum) >= 0 ? nums.indexOf(anchorNum) : (N - 1);
+      const anchorRep = 1;          // Lillie
       function repFor(i) { return REPS[(((anchorRep + (i - anchorIdx)) % n) + n) % n]; }
 
       const batch = nums.slice(start, start + count);

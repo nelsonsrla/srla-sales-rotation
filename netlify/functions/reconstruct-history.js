@@ -42,6 +42,25 @@ exports.handler = async function (event) {
     const token = await getShopifyToken();
     if (!token) throw new Error('No Shopify token in Firebase config');
 
+    if (mode === 'whoami') {
+      // Identify which Shopify app this token belongs to + its scopes.
+      const gql = { query: '{ currentAppInstallation { app { title } accessScopes { handle } } }' };
+      const r = await fetchWithTimeout(`${SHOP}/graphql.json`, {
+        method: 'POST',
+        headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+        body: JSON.stringify(gql)
+      }, 10000);
+      const body = await r.text();
+      let parsed = null; try { parsed = JSON.parse(body); } catch (e) {}
+      const inst = parsed && parsed.data && parsed.data.currentAppInstallation;
+      return { statusCode: 200, headers: cors, body: JSON.stringify({
+        ok: true, mode: 'whoami', status: r.status,
+        app_title: inst && inst.app ? inst.app.title : null,
+        scopes: inst && inst.accessScopes ? inst.accessScopes.map(s => s.handle) : null,
+        raw: parsed ? undefined : body.slice(0, 300)
+      }, null, 2) };
+    }
+
     if (mode === 'probe') {
       const endpoints = [
         `${SHOP}/oauth/access_scopes.json`,

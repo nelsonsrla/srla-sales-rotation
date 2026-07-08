@@ -887,7 +887,10 @@
       <span class="logo-divider"></span>
       <span class="logo-label">Photos</span>
     </a>
-    <div class="header-controls"><a href="/" class="pill">Rotation</a></div>
+    <div class="header-controls">
+      <a href="/" class="pill">Rotation</a>
+      <a href="#" class="pill" id="commission-pill" onclick="srlaCommissionPin(); return false;">&#128274; Commission</a>
+    </div>
   </header>
 
   <main>
@@ -1019,6 +1022,44 @@
     .location-row-name { flex: 1; }
     .location-row-check { color: var(--accent); font-weight: 700; }
   </style>
+  <!-- Admin-PIN gate for Commission navigation (self-contained) -->
+  <style>
+    #srla-pin-ov { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 400; }
+    #srla-pin-ov.show { display: flex; }
+    #srla-pin-box { background: #fff; border-radius: 16px; padding: 22px 20px; width: 260px; max-width: 84vw; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+    #srla-pin-box .t { font-size: 15px; font-weight: 600; color: #111; margin-bottom: 14px; }
+    #srla-pin-in { width: 100%; box-sizing: border-box; padding: 12px; font-size: 22px; text-align: center; letter-spacing: 0.4em; border: 2px solid #e0e0e0; border-radius: 11px; outline: none; }
+    #srla-pin-err { color: #dc2626; font-size: 12px; font-weight: 600; margin-top: 8px; height: 14px; visibility: hidden; }
+    #srla-pin-err.show { visibility: visible; }
+    #srla-pin-box .a { display: flex; gap: 10px; margin-top: 16px; }
+    #srla-pin-box .a button { flex: 1; padding: 11px; border-radius: 11px; font-size: 14px; font-weight: 700; cursor: pointer; border: none; }
+    #srla-pin-cancel { background: #e0e0e0; color: #555; }
+    #srla-pin-ok { background: #111; color: #fff; }
+  </style>
+  <div id="srla-pin-ov" onclick="if(event.target===this)this.classList.remove('show')">
+    <div id="srla-pin-box">
+      <div class="t">Admin PIN — Commission</div>
+      <input id="srla-pin-in" type="tel" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="&#8226;&#8226;&#8226;&#8226;" onkeydown="if(event.key==='Enter')srlaCommissionVerify()">
+      <div id="srla-pin-err">Incorrect PIN</div>
+      <div class="a">
+        <button id="srla-pin-cancel" onclick="document.getElementById('srla-pin-ov').classList.remove('show')">Cancel</button>
+        <button id="srla-pin-ok" onclick="srlaCommissionVerify()">Unlock</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    function srlaCommissionPin(){
+      var ov=document.getElementById('srla-pin-ov'), inp=document.getElementById('srla-pin-in'), err=document.getElementById('srla-pin-err');
+      inp.value=''; if(err) err.classList.remove('show'); ov.classList.add('show');
+      setTimeout(function(){ try{ inp.focus(); }catch(e){} },50);
+    }
+    function srlaCommissionVerify(){
+      var inp=document.getElementById('srla-pin-in'), err=document.getElementById('srla-pin-err');
+      if(inp.value==='2847'){ window.location.href='https://srlacommission.netlify.app'; }
+      else { if(err) err.classList.add('show'); inp.value=''; try{ inp.focus(); }catch(e){} }
+    }
+  </script>
+
   <div class="sheet-overlay" id="location-sheet-overlay" onclick="closeLocationsSheet()"></div>
   <aside class="sheet" id="location-sheet" role="dialog" aria-label="Locations">
     <div class="sheet-handle"></div>

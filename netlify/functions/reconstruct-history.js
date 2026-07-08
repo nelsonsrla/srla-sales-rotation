@@ -42,6 +42,24 @@ exports.handler = async function (event) {
     const token = await getShopifyToken();
     if (!token) throw new Error('No Shopify token in Firebase config');
 
+    if (mode === 'probe') {
+      const endpoints = [
+        `${SHOP}/orders.json?limit=1&status=any`,
+        `${SHOP}/orders.json?limit=1&status=any&name=16144`,
+        `${SHOP}/orders/count.json`,
+        `${SHOP}/shop.json`
+      ];
+      const out = [];
+      for (const url of endpoints) {
+        try {
+          const r = await fetchWithTimeout(url, { headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' } }, 10000);
+          const body = await r.text();
+          out.push({ url: url.replace(SHOP, ''), status: r.status, ok: r.ok, body_preview: body.slice(0, 160) });
+        } catch (e) { out.push({ url: url.replace(SHOP, ''), error: e.message }); }
+      }
+      return { statusCode: 200, headers: cors, body: JSON.stringify({ ok: true, mode: 'probe', endpoints: out }, null, 2) };
+    }
+
     if (mode === 'inspect') {
       const nums = (params.order || '').split(',').map(s => s.trim()).filter(Boolean);
       if (!nums.length) return { statusCode: 400, headers: cors, body: JSON.stringify({ ok: false, error: 'Pass ?order=NUM or comma list' }) };

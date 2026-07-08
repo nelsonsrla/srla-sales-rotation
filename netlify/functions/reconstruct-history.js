@@ -44,8 +44,8 @@ exports.handler = async function (event) {
 
     if (mode === 'probe') {
       const endpoints = [
+        `${SHOP}/oauth/access_scopes.json`,
         `${SHOP}/orders.json?limit=1&status=any`,
-        `${SHOP}/orders.json?limit=1&status=any&name=16144`,
         `${SHOP}/orders/count.json`,
         `${SHOP}/shop.json`
       ];

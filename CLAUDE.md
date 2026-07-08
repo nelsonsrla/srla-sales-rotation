@@ -52,6 +52,14 @@ This auto-deploys via GitHub → Netlify. No manual deploy command needed.
 - Column toggle (1/2/4 columns)
 - iOS share sheet for photos
 - Rotation link in header → /
+- Location View: "Locations" button → drawer of Consignr physical locations → pick one (e.g. "Summer League 2K26") to browse ONLY the items at that location, with photos. Banner shows count + Exit. Backed by netlify/functions/photos-consignr-locations.js.
+
+## Consignr Location Data (photos Location View)
+- The main photos catalog uses Consignr `/products?instoreOnly=true` (~390 curated products) — these do NOT carry location.
+- Physical location lives on Consignr `/items` (item.location.id + embedded product w/ images). There are 8 locations via `/locations`; Summer League 2K26 = location_aQE2EH1wONCFHSws61Zo0.
+- `/items` ignores a server-side location filter, so photos-consignr-locations.js fetches ALL active items (status=ACTIVE&limit=100&page=N, ~7.5k items / ~7s, MAX_PAGES cap) and groups by location.id client-side.
+- Endpoint actions: `?action=locations` (fast list) and `?action=products&locationId=XXX` (catalog-shaped product cards for that location, so the existing grid/share reuse works).
+- NOTE: catalog products (instoreOnly) barely overlap the location map — the Location View is intentionally sourced from /items, not the 390-product catalog.
 
 ## Standing Rules for All Builds
 - All folder names must be lowercase (Netlify Linux is case-sensitive)

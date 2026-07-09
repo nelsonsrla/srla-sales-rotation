@@ -4,7 +4,8 @@ const ALLOWED_HOSTNAMES = [
   'storage.googleapis.com',
   'consignr-images.s3.amazonaws.com',
   'consignr.app',
-  'images.consignr.app'
+  'images.consignr.app',
+  'cloudinary.com'   // Consignr /items product images (Location View) are served from res.cloudinary.com
 ];
 
 function isAllowedUrl(urlStr) {

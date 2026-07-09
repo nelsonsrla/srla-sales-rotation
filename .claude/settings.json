@@ -1,4 +1,30 @@
 {
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(git *)",
+      "Bash(curl *)",
+      "Bash(node *)",
+      "Bash(grep *)",
+      "Bash(sed *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Bash(python3 *)",
+      "Bash(chmod *)",
+      "Bash(echo *)",
+      "Bash(cd *)",
+      "Bash(mkdir *)",
+      "Bash(awk *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(sleep *)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {

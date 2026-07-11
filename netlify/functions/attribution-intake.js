@@ -56,8 +56,14 @@ exports.handler = async function (event) {
     return { statusCode: 200, headers, body: JSON.stringify({ ok: true, info: 'POST attribution emails here: { subject, body }. Stored to rotation/attributions.' }) };
   }
   try {
+    const rawBody = event.body || '';
     let payload = {};
-    try { payload = JSON.parse(event.body || '{}'); } catch (e) { payload = {}; }
+    try { const p = JSON.parse(rawBody); if (p && typeof p === 'object') payload = p; } catch (e) { payload = {}; }
+    // If it wasn't JSON with our fields, treat the raw POST body as the email text itself
+    // (lets Power Automate just send the email Body as text/plain — no JSON escaping needed).
+    if (!payload.subject && !payload.body && !payload.bodyPreview && !payload.bodyText && !payload.orderNum && rawBody) {
+      payload = { subject: '', body: rawBody };
+    }
 
     // Accept structured fields, else parse from subject/body.
     let orderNum = payload.orderNum ? String(payload.orderNum).replace('#', '').trim() : null;
